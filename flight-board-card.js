@@ -52,7 +52,7 @@ const FBC_DEFAULTS = {
   arrivals_entity: "sensor.flightradar24_airport_arrivals",
   airport_entity: "text.flightradar24_airport_track",
   rows: 12, past_minutes: 15, font_size: 22, timezone: undefined,
-  theme: "classic", time_format: "24h", show: "both", layout: "auto", show_airline: true,
+  theme: "classic", time_format: "24h", time_zone_mode: "airport", show: "both", layout: "auto", show_airline: true,
   show_selector: true, show_airport_selector: true,
   show_airline_selector: true, hide_private: true, airline: "",
   allow_add_airlines: true, show_window_selector: true, time_window: 0, city_codes: "auto", sort: "time", header_image: "", compact_time: true, show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50, 100, 200], max_rows: 250,
@@ -160,6 +160,12 @@ class FlightBoardCard extends HTMLElement {
       const ps = String(savedSort).split(":");
       if (sk.indexOf(ps[0]) >= 0) { this._sortKey = ps[0]; this._sortDir = ps[1] === "-1" ? -1 : 1; }
     }
+    // Time zone for the pop-up and tracking times: "airport" = each airport's own local time, "board" = the board airport's zone
+    this._tzSave = "flight-board-card-tz";
+    this._tzMode = String(this._config.time_zone_mode || "airport").toLowerCase() === "board" ? "board" : "airport";
+    let savedTz = null;
+    try { savedTz = localStorage.getItem(this._tzSave); } catch (e) {}
+    if (savedTz === "board" || savedTz === "airport") this._tzMode = savedTz;
     this._apc = null;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._built = false;
@@ -188,6 +194,22 @@ class FlightBoardCard extends HTMLElement {
     const db = fbcDb().find(a => a.icao === v || a.iata === v);
     if (db) return { icao: db.icao, iata: db.iata, name: db.name, tz: db.tz };
     return { icao: v, iata: this._config.code || v, name: this._config.title || v, tz: this._config.timezone };
+  }
+  // Time zone of any airport by IATA/ICAO code (null when unknown, so the board airport's zone is used)
+  _tzOf(code) {
+    if (this._tzMode !== "airport" || !code) return null;
+    const v = String(code).toUpperCase();
+    const hit = fbcDb().find(a => a.iata === v || a.icao === v);
+    return hit && hit.tz ? hit.tz : null;
+  }
+  // Short zone name such as CDT or PDT for a moment in time
+  _tzAbbr(ts, tz) {
+    if (!ts || !tz) return "";
+    try {
+      const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date(ts * 1000));
+      const z = p.find(x => x.type === "timeZoneName");
+      return z ? z.value : "";
+    } catch (e) { return ""; }
   }
   _ap() {
     const s = this._hass && this._hass.states[this._config.airport_entity];
@@ -306,6 +328,7 @@ th .sorth.on { color:var(--fg); }
 .board.narrow:not(.splitflap):not(.raleigh):not(.london) .s { width:33%; }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
+.ptz { position:absolute; top:12px; right:48px; background:none; border:1px solid var(--line); color:var(--sub); font-size:12px; border-radius:14px; padding:3px 10px; cursor:pointer; }
 .pclose { position:absolute; top:8px; right:12px; background:none; border:0; color:var(--sub); font-size:28px; line-height:1; cursor:pointer; padding:4px 8px; }
 .ptitle { font-size:26px; font-weight:800; letter-spacing:1px; padding-right:36px; }
 .psub { color:var(--sub); font-size:13px; margin-top:2px; }
@@ -697,6 +720,12 @@ th .sorth.on { color:var(--fg); }
     if (popEl) {
       popEl.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (e.target.closest && e.target.closest(".ptz")) {
+          this._tzMode = this._tzMode === "airport" ? "board" : "airport";
+          try { localStorage.setItem(this._tzSave, this._tzMode); } catch (err) {}
+          this._render();
+          return;
+        }
         if (e.target === popEl || e.target.closest(".pclose")) this._closePopup();
       });
     }
@@ -833,13 +862,7 @@ th .sorth.on { color:var(--fg); }
     const T = k => { const v = this._num(pick(lv && lv[k], sc && sc[k], raw[k])); return v > 0 ? v : 0; };
     const sd = T("time_scheduled_departure"), ed = T("time_estimated_departure"), rd = T("time_real_departure");
     const sa = T("time_scheduled_arrival"), ea = T("time_estimated_arrival"), ra = T("time_real_arrival");
-    const tl = (s, e, a) => {
-      const bits = [];
-      const day = this._dayTag(a || e || s);
-      if (a) bits.push("Actual " + this._fmt(a)); else if (e && s && e !== s) bits.push("Est " + this._fmt(e));
-      if (s) bits.push("Sched " + this._fmt(s));
-      return (bits.join(" - ") || "-") + (day ? " (" + day + ")" : "");
-    };
+    const oTz = this._tzOf(o.code), dTz = this._tzOf(d.code);
     // Gates at both ends
     const side = k => ({ gate: g("airport_" + k + "_gate"), term: g("airport_" + k + "_terminal"), belt: k === "destination" ? g("airport_destination_baggage") : null });
     const og = side("origin"), dg = side("destination");
@@ -858,8 +881,8 @@ th .sorth.on { color:var(--fg); }
     let cd = "";
     const landed = !!ra || (lv && lv.has_landed);
     if (landed) cd = ra ? "Landed " + this._dur(now - ra) + " ago" : "Landed";
-    else if (rd || (pos && !pos.onGround && pos.alt && pos.alt > 500)) { const t = ea || sa; cd = t ? (t > now ? "Lands in " + this._dur(t - now) : "Landing now (expected " + this._fmt(t) + ")") : ""; }
-    else { const t = ed || sd; cd = t ? (t > now ? "Departs in " + this._dur(t - now) : "Departure time passed (" + this._fmt(t) + ")") : ""; }
+    else if (rd || (pos && !pos.onGround && pos.alt && pos.alt > 500)) { const t = ea || sa; cd = t ? (t > now ? "Lands in " + this._dur(t - now) : "Landing now (expected " + this._fmt(t, dTz) + ")") : ""; }
+    else { const t = ed || sd; cd = t ? (t > now ? "Departs in " + this._dur(t - now) : "Departure time passed (" + this._fmt(t, oTz) + ")") : ""; }
     // Distance to the destination airport
     let dist = "";
     const dla = g("airport_destination_latitude"), dlo = g("airport_destination_longitude");
@@ -874,12 +897,14 @@ th .sorth.on { color:var(--fg); }
         `<div class="gs-g">${E(has(x.gate) ? x.gate : "-")}</div></div>${bits.length ? `<div class="gs-sub">${bits.map(b => `<span>${b}</span>`).join("")}</div>` : ""}</div></div>`;
     };
     // Times as tidy cells: Scheduled on the left, Actual or Estimated on the right
-    const tc = (sv, ev, av) => {
-      const day = x => { const dd = this._dayTag(x); return dd ? " (" + dd + ")" : ""; };
+    const tc = (sv, ev, av, tz) => {
+      const day = x => { const dd = this._dayTag(x, tz); return dd ? " (" + dd + ")" : ""; };
+      const zn = x => { const z = tz ? this._tzAbbr(x, tz) : ""; return z ? " " + z : ""; };
+      const one = x => this._fmt(x, tz) + zn(x) + day(x);
       let out = "";
-      if (sv) out += cell("Scheduled", this._fmt(sv) + day(sv));
-      if (av) out += cell("Actual", this._fmt(av) + day(av));
-      else if (ev && (!sv || ev !== sv)) out += cell("Estimated", this._fmt(ev) + day(ev));
+      if (sv) out += cell("Scheduled", one(sv));
+      if (av) out += cell("Actual", one(av));
+      else if (ev && (!sv || ev !== sv)) out += cell("Estimated", one(ev));
       return out || cell("Time", "-");
     };
     const cell = (label, val, big) => has(val) ? `<div${big ? ' class="pbig"' : ""}><span>${E(label)}</span><b>${E(val)}</b></div>` : "";
@@ -888,14 +913,15 @@ th .sorth.on { color:var(--fg); }
     const airline = pick(g("airline"), raw.airline, r.al) || "";
     const cls = r.cls === "ok" || r.cls === "warn" || r.cls === "bad" ? " " + r.cls : "";
     let h = `<div class="pcard"><button class="pclose" type="button" title="Close">&times;</button>`;
+    h += `<button class="ptz" type="button" title="Switch between each airport's local time and the board airport's time">Times: ${this._tzMode === "airport" ? "airport local" : "board airport"}</button>`;
     h += `<div class="ptitle">${E(title)}</div><div class="psub">${E(airline)}${model ? " - " + E(model) : ""}${reg2 ? " - " + E(reg2) : ""}</div>`;
     // Only the gate that matters for this row: the arrival gate for an arrival, the departure gate for a departure
     const signs = r.kind === "arr" ? sign("Arrival gate", d.code, dg, true, "arr") : sign("Departure gate", o.code, og, false, "dep");
     if (signs) h += `<div class="gsigns">${signs}</div>`;
     h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm"><svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="98" y2="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/></svg><svg class="pa2" viewBox="0 0 10 12" aria-hidden="true"><path d="M1 1 L9 6 L1 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
     h += `<span class="pbadge${cls}">${E(r.s)}</span>${cd ? ` <span class="psub">${E(cd)}</span>` : ""}`;
-    h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}</h4><div class="pgrid">${tc(sd, ed, rd)}</div></div>`;
-    h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}</h4><div class="pgrid">${tc(sa, ea, ra)}</div></div>`;
+    h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}${oTz ? " (local time)" : ""}</h4><div class="pgrid">${tc(sd, ed, rd, oTz)}</div></div>`;
+    h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}${dTz ? " (local time)" : ""}</h4><div class="pgrid">${tc(sa, ea, ra, dTz)}</div></div>`;
     if (pos) {
       const ago = pos.when ? " - " + this._dur(now - pos.when) + " ago" : "";
       h += `<div class="psec"><h4>Position - ${E(pos.src)}${E(ago)}</h4><div class="pgrid">` +
@@ -1034,9 +1060,9 @@ th .sorth.on { color:var(--fg); }
     const arr = "M2.5 19h19v2h-19v-2zm7.18-5.73l4.35 1.16 5.31 1.42c.8.21 1.62-.26 1.84-1.06.21-.8-.26-1.62-1.06-1.84l-5.31-1.42-2.76-9.02L10.12 2v8.28L5.15 8.95l-.93-2.32-1.45-.39v5.17l1.6.43 5.31 1.43z";
     return `<svg viewBox="0 0 24 24"><path d="${kind === "dep" ? dep : arr}"/></svg>`;
   }
-  _fmt(ts) {
+  _fmt(ts, zone) {
     if (!ts) return "--:--";
-    const d = new Date(ts * 1000), tz = this._ap().tz || this._config.timezone;
+    const d = new Date(ts * 1000), tz = zone || this._ap().tz || this._config.timezone;
     let hh, mm;
     try {
       const parts = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: tz }).formatToParts(d);
@@ -1292,6 +1318,7 @@ th .sorth.on { color:var(--fg); }
     const air = f.on_ground !== undefined && f.on_ground !== null && Number(f.on_ground) === 0;
     const landed = !!f.has_landed || ra > 0;
     const num = String(f.flight_number || f.callsign || f.aircraft_registration || "");
+    const lz = arriving ? null : this._tzOf(dI);
     const city = String((arriving ? (f.airport_origin_city || f.airport_origin_name || f.airport_origin_code_iata)
       : (f.airport_destination_city || f.airport_destination_name || f.airport_destination_code_iata)) || "");
     const base = { id: num + "-live", fl: num, keys: this._flightKeys(f), idk: this._flightKeys(f, true), kind: arriving ? "arr" : "dep",
@@ -1301,11 +1328,11 @@ th .sorth.on { color:var(--fg); }
       return Object.assign(base, { t: "--:--", c: "Not airborne yet", al: String(f.airline_short || f.airline || ""), s: "SCHEDULED", cls: "" });
     }
     let s = "SCHEDULED", cls = "", ts = sd || ed;
-    if (landed) { s = ra ? "LANDED " + this._fmt(ra) : "LANDED"; cls = "ok"; ts = ra || ea || sa; }
+    if (landed) { s = ra ? "LANDED " + this._fmt(ra, lz) : "LANDED"; cls = "ok"; ts = ra || ea || sa; }
     else if (air) {
       ts = ea || sa;
-      s = ea ? "ETA " + this._fmt(ea) : "AIRBORNE";
-      if (ea && sa && ea - sa >= 900) { s = "DELAYED " + this._fmt(ea); cls = "warn"; }
+      s = ea ? "ETA " + this._fmt(ea, lz) : "AIRBORNE";
+      if (ea && sa && ea - sa >= 900) { s = "DELAYED " + this._fmt(ea, lz); cls = "warn"; }
     } else if (rd) { s = "DEPARTED " + this._fmt(rd); cls = "ok"; ts = ea || sa || rd; }
     else if (ed && sd && ed !== sd) { const late = ed - sd >= 900; s = (late ? "DELAYED " : "EXPECTED ") + this._fmt(ed); cls = late ? "warn" : ""; }
     // Not airborne and leaving on another day: show the date instead of a time-only status
@@ -1339,10 +1366,10 @@ th .sorth.on { color:var(--fg); }
     return m;
   }
   // "OCT 9" when the time is not today (airport local time), else ""
-  _dayTag(ts) {
+  _dayTag(ts, zone) {
     if (!ts) return "";
     try {
-      const tz = this._ap().tz || this._config.timezone;
+      const tz = zone || this._ap().tz || this._config.timezone;
       const day = d => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
       const d = new Date(ts * 1000);
       if (day(d) === day(new Date())) return "";
@@ -1875,7 +1902,7 @@ th .sorth.on { color:var(--fg); }
 }
 
 const FBC_LABELS = {
-  theme: "Start style", time_format: "Time format", font_size: "Text size (px)", rows: "Rows per list",
+  theme: "Start style", time_format: "Time format", time_zone_mode: "Pop-up time zone", font_size: "Text size (px)", rows: "Rows per list",
   show: "Show", layout: "Layout", past_minutes: "Hide departed/landed flights after (minutes)",
   show_airline: "Show airline and airport code", show_selector: "Show style menu on the card",
   show_airport_selector: "Show airport search on the card",
@@ -1893,6 +1920,7 @@ const FBC_LABELS = {
 const FBC_SCHEMA = [
   { name: "theme", selector: { select: { mode: "dropdown", options: Object.entries(FBC_THEMES).map(([value, label]) => ({ value, label })) } } },
   { type: "grid", name: "", schema: [
+    { name: "time_zone_mode", selector: { select: { mode: "dropdown", options: [{ value: "airport", label: "Each airport's local time" }, { value: "board", label: "Board airport's time" }] } } },
     { name: "time_format", selector: { select: { mode: "dropdown", options: [{ value: "24h", label: "24-hour (18:30)" }, { value: "12h", label: "12-hour (6:30 PM)" }] } } },
     { name: "show", selector: { select: { mode: "dropdown", options: [{ value: "both", label: "Departures and arrivals" }, { value: "departures", label: "Departures only" }, { value: "arrivals", label: "Arrivals only" }] } } },
   ] },

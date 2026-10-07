@@ -27,6 +27,7 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
   - **Digital flaps**: modern flap-look panels
   - **Amsterdam style**: dark blue and yellow, clean and very readable
   - **London style**: Heathrow-inspired black and yellow, with a Gate and Belt column
+  - **Raleigh style**: blue banner and white rows with City / Time, Airline / Flight, Gate and Status, like the boards at Raleigh-Durham
   - **LED dot-matrix**: glowing amber retro display
 - Airport search on the card: type a name, city, IATA or ICAO code and pick from about 8,000 airports worldwide, with no setup or API key needed
 - A short list of favourite airports is shown when you tap the search field. Use the built-in list or set your own.
@@ -128,6 +129,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `show_gate` | `true` | Show a Gate column (gate, terminal, baggage belt) in the tracking panels. Needs the companion script |
 | `flight_popup` | `true` | Click any flight on the board to open a details pop-up (times, gate, baggage belt, position, altitude, time to landing) |
 | `gates_entity` | `sensor.flight_board_gates` | London style only: sensor with the gate (departures) and baggage belt (arrivals) of every flight on the board. Published by the companion script |
+| `airline_logos` | (none) | Raleigh style: your own logo images by airline code, for example `{AA: /local/logos/aa.png, DL: /local/logos/dl.png}`. Put the image files in `/config/www/logos/`. Without a logo the airline name is shown as text. No logos are bundled with the card |
 | `lookup_service` | `pyscript.flight_board_lookup` | Service of the companion script that the card calls to look up a flight |
 | `tracked_flights` | (none) | Flight numbers always tracked, for example `[AA1234, DL567]`. Flights added on the card are saved on that device and can be removed with the x |
 | `hide_private` | `true` | Hide private, charter and general-aviation flights (flights without an airline IATA code) |

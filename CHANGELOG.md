@@ -2,6 +2,7 @@
 
 ## 1.10.0 (fork)
 - Click a column title to sort the board on it, in every style (Time, Destination/From, Flight, Gate, Status; Raleigh also City and Airline); click again to reverse. Remembered per device. Option `sort` sets the starting order.
+- Script: optional Aviationstack source (free plan) for gate, terminal and baggage belt, asked only when a flight is clicked, cached for an hour and capped per month.
 - Raleigh: pop-up text is now readable (it was white on white).
 - Companion script: OpenSky is now asked for all airborne flights in one request every 5 minutes (was one request per flight every 2 minutes), and pauses when OpenSky answers HTTP 429 (too many requests) instead of retrying every minute.
 - Raleigh style closer to the real boards: option `sort: city` lists flights A-Z by city (airport code when codes are shown), `header_image` puts your own picture behind the DEPARTURES and ARRIVALS banner, and times read `01:45PM` (`compact_time`).

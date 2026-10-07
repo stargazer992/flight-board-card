@@ -23,6 +23,8 @@
 #     of them, at most once per OPENSKY_REFRESH_SECONDS. When OpenSky answers
 #     "too many requests" (429) the script pauses OpenSky and keeps the last position.
 #   - Results are cached so Flightradar24 is asked at most once per CACHE_SECONDS.
+#   - Aviationstack (optional, free plan = 100 requests a month) is asked ONLY when
+#     you click a flight, to fill an empty gate, terminal or belt. See AVIATIONSTACK_*.
 #
 # OPENSKY ACCOUNT (optional)
 #   Works without an account (about 400 requests a day, shared by IP). A free
@@ -105,6 +107,20 @@ AERODATABOX_URL = "https://aerodatabox.p.rapidapi.com/flights/number/{number}/{d
 ADB_WINDOW_HOURS = 8
 ADB_CACHE_SECONDS = 1800
 
+# Third gate source (optional): Aviationstack. The FREE plan only allows 100
+# requests a MONTH, so it is NEVER used by the periodic rebuild. It is asked only
+# when you click a flight (pyscript.flight_board_lookup from the card pop-up), at
+# most once per AVS_CACHE_SECONDS per flight, and never more than AVS_MONTHLY_LIMIT
+# times a month (the counter restarts when PyScript reloads, so the limit is a
+# safety net; Aviationstack also refuses requests itself once your quota is used).
+# It only fills gate, terminal and baggage belt that are still empty.
+# Create the key at https://aviationstack.com and paste it here (do not share it).
+# Leave it empty to switch it off.
+AVIATIONSTACK_API_KEY = ""
+AVIATIONSTACK_URL = "https://api.aviationstack.com/v1/flights"
+AVS_CACHE_SECONDS = 3600
+AVS_MONTHLY_LIMIT = 90
+
 # A flight is looked up at most once per this many seconds
 CACHE_SECONDS = 900
 
@@ -150,6 +166,8 @@ SCHEDULE_STATE = {
     "cache": {},       # code -> {"at": ts, "leg": dict or None}
     "os_cache": {},    # code -> {"at": ts, "data": dict or None}
     "adb_cache": {},   # code -> {"at": ts, "fields": dict}
+    "avs_cache": {},   # code -> {"at": ts, "fields": dict}  (filled only by a card click)
+    "avs_usage": {"month": "", "count": 0, "logged": False},
     "board_cache": {}, # "airport|mode" -> {"at": ts, "items": {flight number: [entries]}}
     "watch": {},       # code -> expiry timestamp (asked by the card)
     "token": {"value": "", "expires": 0},
@@ -522,6 +540,82 @@ def fb_sched_add_aerodatabox(code, leg):
             leg[key] = fields[key]
 
 
+def fb_sched_avs_merge(code, leg):
+    # Fills empty gate, terminal and belt from the Aviationstack cache. This never
+    # makes a request, so the periodic rebuild cannot use up the free quota.
+    if leg is None:
+        return
+    entry = SCHEDULE_STATE["avs_cache"].get(code)
+    if entry is None:
+        return
+    fields = entry["fields"]
+    for key in fields:
+        if fields[key] and not leg.get(key):
+            leg[key] = fields[key]
+
+
+def fb_sched_avs_lookup(code):
+    # ONE Aviationstack request for a flight the user clicked. Returns True when
+    # new data was stored. Any failure only logs a warning (the board keeps working).
+    if not AVIATIONSTACK_API_KEY:
+        return False
+    now = time.time()
+    entry = SCHEDULE_STATE["avs_cache"].get(code)
+    if entry is not None and now - entry["at"] < AVS_CACHE_SECONDS:
+        return False
+    usage = SCHEDULE_STATE["avs_usage"]
+    month = time.strftime("%Y-%m", time.gmtime(now))
+    if usage["month"] != month:
+        usage["month"] = month
+        usage["count"] = 0
+    if usage["count"] >= AVS_MONTHLY_LIMIT:
+        log.warning(f"{LOG_PREFIX}: Aviationstack monthly safety limit ({AVS_MONTHLY_LIMIT}) reached, not asking for {code}")
+        return False
+    fields = {}
+    try:
+        usage["count"] = usage["count"] + 1
+        query = urllib.parse.urlencode({"access_key": AVIATIONSTACK_API_KEY, "flight_iata": code, "limit": 10})
+        payload = fb_sched_http_json(AVIATIONSTACK_URL + "?" + query)
+        err = fb_sched_get(payload, ["error"])
+        if err:
+            # e.g. usage_limit_reached, invalid_access_key: never include the key in a message
+            log.warning(f"{LOG_PREFIX}: Aviationstack refused {code}: {fb_sched_get(err, ['code'])} {fb_sched_get(err, ['message'])}")
+            fb_sched_notify_error(f"Aviationstack: {fb_sched_get(err, ['code'])}")
+            SCHEDULE_STATE["avs_cache"][code] = {"at": now, "fields": {}}
+            return False
+        items = fb_sched_get(payload, ["data"]) or []
+        if not isinstance(items, list):
+            items = []
+        # Prefer the flight whose departure is closest to now
+        best = None
+        best_gap = None
+        for item in items:
+            sched = fb_sched_get(item, ["departure", "scheduled"])
+            gap = 10 ** 9
+            try:
+                if sched:
+                    gap = abs(time.mktime(time.strptime(str(sched)[:19], "%Y-%m-%dT%H:%M:%S")) - now)
+            except Exception:
+                gap = 10 ** 9
+            if best is None or gap < best_gap:
+                best = item
+                best_gap = gap
+        if best is not None:
+            fields = {
+                "airport_origin_gate": fb_sched_clean(fb_sched_get(best, ["departure", "gate"])),
+                "airport_origin_terminal": fb_sched_clean(fb_sched_get(best, ["departure", "terminal"])),
+                "airport_destination_gate": fb_sched_clean(fb_sched_get(best, ["arrival", "gate"])),
+                "airport_destination_terminal": fb_sched_clean(fb_sched_get(best, ["arrival", "terminal"])),
+                "airport_destination_baggage": fb_sched_clean(fb_sched_get(best, ["arrival", "baggage"])),
+            }
+        SCHEDULE_STATE["avs_cache"][code] = {"at": now, "fields": fields}
+        log.info(f"{LOG_PREFIX}: Aviationstack {code}: {len(items)} result(s), request {usage['count']} this month, fields {fields}")
+        return True
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: Aviationstack lookup for {code} failed: {e}")
+        return False
+
+
 def fb_sched_fetch(code):
     # Download the flight list for one flight number and return the best leg (dict) or None.
     # Raises on network or parse errors so the caller can log and keep the old data.
@@ -541,6 +635,7 @@ def fb_sched_fetch(code):
         fb_sched_add_details(best)
         fb_sched_add_board_gates(best)
         fb_sched_add_aerodatabox(code, best)
+        fb_sched_avs_merge(code, best)
     return best
 
 
@@ -918,7 +1013,16 @@ def flight_board_lookup(code=None):
         now = time.time()
         known = norm in SCHEDULE_STATE["watch"] and SCHEDULE_STATE["cache"].get(norm) is not None
         SCHEDULE_STATE["watch"][norm] = now + WATCH_MINUTES * 60
-        if known:
+        # Aviationstack (free plan): only asked here, when a flight is clicked
+        fresh = False
+        try:
+            fresh = fb_sched_avs_lookup(norm)
+        except Exception as e:
+            log.warning(f"{LOG_PREFIX}: Aviationstack step failed for {norm}: {e}")
+        if fresh:
+            # Drop the cached leg so the next rebuild merges the new gate data
+            SCHEDULE_STATE["cache"].pop(norm, None)
+        if known and not fresh:
             # Already looked up recently; the periodic rebuild keeps it fresh
             return
         waited = 0

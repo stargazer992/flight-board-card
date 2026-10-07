@@ -312,7 +312,7 @@ th .sorth.on { color:var(--fg); }
 .psub { color:var(--sub); font-size:13px; margin-top:2px; }
 .proute { display:flex; align-items:center; gap:12px; margin:14px 0 6px; }
 .proute .pa { flex:1; } .proute .pa b { display:block; font-size:24px; letter-spacing:1px; } .proute .pa span { color:var(--sub); font-size:13px; }
-.proute .pm { color:var(--sub); font-size:22px; }
+.proute .pm { color:var(--sub); flex:0 0 26%; display:flex; align-items:center; gap:2px; } .proute .pm svg { height:12px; } .proute .pm svg:first-child { flex:1; min-width:0; width:100%; } .proute .pm .pa2 { width:8px; flex:none; }
 .pbadge { display:inline-block; margin:6px 0 2px; padding:3px 10px; border-radius:20px; font-weight:700; font-size:13px; letter-spacing:1px; border:1px solid var(--line); }
 .pbadge.ok { color:var(--ok); } .pbadge.warn { color:var(--warn); } .pbadge.bad { color:var(--bad); }
 .psec { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
@@ -882,6 +882,15 @@ th .sorth.on { color:var(--fg); }
       return `<div><div class="gcap">${E(cap)}${code ? " - " + E(code) : ""}</div><div class="gsign"><div class="gs-main"><div class="gs-lab"><div class="gs-ic">${this._icon(kind)}</div><div class="gs-l">Gate</div></div>` +
         `<div class="gs-g">${E(has(x.gate) ? x.gate : "-")}</div></div>${bits.length ? `<div class="gs-sub">${bits.map(b => `<span>${b}</span>`).join("")}</div>` : ""}</div></div>`;
     };
+    // Times as tidy cells: Scheduled on the left, Actual or Estimated on the right
+    const tc = (sv, ev, av) => {
+      const day = x => { const dd = this._dayTag(x); return dd ? " (" + dd + ")" : ""; };
+      let out = "";
+      if (sv) out += cell("Scheduled", this._fmt(sv) + day(sv));
+      if (av) out += cell("Actual", this._fmt(av) + day(av));
+      else if (ev && (!sv || ev !== sv)) out += cell("Estimated", this._fmt(ev) + day(ev));
+      return out || cell("Time", "-");
+    };
     const cell = (label, val, big) => has(val) ? `<div${big ? ' class="pbig"' : ""}><span>${E(label)}</span><b>${E(val)}</b></div>` : "";
     const model = pick(g("aircraft_model"), raw.aircraft_model), reg2 = pick(g("aircraft_registration"), raw.aircraft_registration);
     const title = r.fl || pop.code;
@@ -892,10 +901,10 @@ th .sorth.on { color:var(--fg); }
     // Only the gate that matters for this row: the arrival gate for an arrival, the departure gate for a departure
     const signs = r.kind === "arr" ? sign("Arrival gate", d.code, dg, true, "arr") : sign("Departure gate", o.code, og, false, "dep");
     if (signs) h += `<div class="gsigns">${signs}</div>`;
-    h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm">&#9992;</div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
+    h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm"><svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="98" y2="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/></svg><svg class="pa2" viewBox="0 0 10 12" aria-hidden="true"><path d="M1 1 L9 6 L1 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
     h += `<span class="pbadge${cls}">${E(r.s)}</span>${cd ? ` <span class="psub">${E(cd)}</span>` : ""}`;
-    h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}</h4><div class="pgrid">${cell("Time", tl(sd, ed, rd))}</div></div>`;
-    h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}</h4><div class="pgrid">${cell("Time", tl(sa, ea, ra))}</div></div>`;
+    h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}</h4><div class="pgrid">${tc(sd, ed, rd)}</div></div>`;
+    h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}</h4><div class="pgrid">${tc(sa, ea, ra)}</div></div>`;
     if (pos) {
       const ago = pos.when ? " - " + this._dur(now - pos.when) + " ago" : "";
       h += `<div class="psec"><h4>Position - ${E(pos.src)}${E(ago)}</h4><div class="pgrid">` +

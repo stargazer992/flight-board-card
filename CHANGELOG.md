@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Pop-up: the plane emoji between the airports is now a clean dashed arrow, and times show as tidy Scheduled / Actual (or Estimated) cells instead of one long line.
 - Phones: the dropdown menus stay on screen, and the Classic, Digital, Amsterdam, London and LED boards get smaller text and rebalanced columns so flight numbers and status are no longer cut off.
 - Phones: the airport search, selectors and clock wrap onto the screen width instead of running off the side.
 - Split-flap on phones: each table shrinks its tiles until the flight number, gate and times fit (the tracking row with a gate column was cut off).

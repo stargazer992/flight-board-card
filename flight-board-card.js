@@ -329,6 +329,12 @@ th .sorth.on { color:var(--fg); }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
 .ptz { position:absolute; top:12px; right:48px; background:none; border:1px solid var(--line); color:var(--sub); font-size:12px; border-radius:14px; padding:3px 10px; cursor:pointer; }
+.ptrk { display:flex; align-items:center; gap:10px; margin:10px 0 4px; color:var(--sub); font-size:14px; }
+.ptsw { width:44px; height:24px; border-radius:12px; border:1px solid var(--line); background:transparent; position:relative; cursor:pointer; padding:0; flex:none; }
+.ptsw .ptk { position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--sub); transition:left .15s, background .15s; }
+.ptsw.on { background:var(--accent); border-color:var(--accent); }
+.ptsw.on .ptk { left:22px; background:var(--bg); }
+.ptsw:disabled { opacity:.55; cursor:default; }
 .pclose { position:absolute; top:8px; right:12px; background:none; border:0; color:var(--sub); font-size:28px; line-height:1; cursor:pointer; padding:4px 8px; }
 .ptitle { font-size:26px; font-weight:800; letter-spacing:1px; padding-right:36px; }
 .psub { color:var(--sub); font-size:13px; margin-top:2px; }
@@ -725,6 +731,16 @@ th .sorth.on { color:var(--fg); }
     if (popEl) {
       popEl.addEventListener("click", (e) => {
         e.stopPropagation();
+        const sw = e.target.closest && e.target.closest(".ptsw");
+        if (sw) {
+          if (sw.disabled) return;
+          const code = sw.dataset.code;
+          const mine = this._trackedAll().filter(o => o.extra && ((this._pop && this._pop.snap && this._pop.snap.keys) || []).indexOf(o.code) >= 0);
+          if (sw.classList.contains("on")) { for (const o of mine) this._removeTrack(o.code); if (!mine.length) this._removeTrack(code); }
+          else this._addTrack(code);
+          this._renderPopup();
+          return;
+        }
         if (e.target.closest && e.target.closest(".ptz")) {
           this._tzMode = this._tzMode === "airport" ? "board" : "airport";
           try { localStorage.setItem(this._tzSave, this._tzMode); } catch (err) {}
@@ -920,6 +936,12 @@ th .sorth.on { color:var(--fg); }
     let h = `<div class="pcard"><button class="pclose" type="button" title="Close">&times;</button>`;
     h += `<button class="ptz" type="button" title="Switch between each airport's local time and the board airport's time">Times: ${this._tzMode === "airport" ? "airport local" : "board airport"}</button>`;
     h += `<div class="ptitle">${E(title)}</div><div class="psub">${E(airline)}${model ? " - " + E(model) : ""}${reg2 ? " - " + E(reg2) : ""}</div>`;
+    // Track on / off switch: on when any of this flight's codes is tracked; flights listed in the YAML cannot be switched off here
+    const trkCodes = this._trackedAll().filter(o => (r.keys || []).indexOf(o.code) >= 0);
+    const trkOn = trkCodes.length > 0, trkLocked = trkOn && trkCodes.every(o => !o.extra);
+    if (this._config.show_flight_tracker !== false || trkOn) {
+      h += `<div class="ptrk"><button class="ptsw${trkOn ? " on" : ""}" type="button" role="switch" aria-checked="${trkOn}"${trkLocked ? " disabled" : ""} data-code="${E(this._trkNorm(r.fl || pop.code))}" title="${trkLocked ? "Tracked from the card YAML" : "Track this flight"}"><span class="ptk"></span></button><span>Track this flight${trkLocked ? " (set in the card YAML)" : ""}</span></div>`;
+    }
     // Only the gate that matters for this row: the arrival gate for an arrival, the departure gate for a departure
     const signs = r.kind === "arr" ? sign("Arrival gate", d.code, dg, true, "arr") : sign("Departure gate", o.code, og, false, "dep");
     if (signs) h += `<div class="gsigns">${signs}</div>`;

@@ -1788,6 +1788,24 @@ th .sorth.on { color:var(--fg); }
     if (dc || dk) to = { c: dc || to.c, k: dk || to.k };
     return { from, to };
   }
+  // Tracked-only card: time and status are about the ARRIVAL, in the destination airport's local time
+  _arrRow(r, kind) {
+    const lv = this._liveByKeys(r.idk || r.keys), sc = this._schedByKeys(r.idk || r.keys), raw = r.raw || {};
+    const pick = k => { for (const src of [lv, sc, raw]) { const v = this._num(src && src[k]); if (v > 0) return v; } return 0; };
+    const sa = pick("time_scheduled_arrival"), ea = pick("time_estimated_arrival"), ra = pick("time_real_arrival"), rd = pick("time_real_departure");
+    const to = this._ends(r, kind).to, tz = this._tzOf(to.k) || null;
+    const ts = ra || ea || sa;
+    if (!ts) return {};   // no arrival time known: keep the board's own time and status
+    const fm = x => this._fmt(x, tz);
+    const air = !!(lv && lv.on_ground !== undefined && lv.on_ground !== null && Number(lv.on_ground) === 0);
+    let st, cls = "";
+    if (ra || (lv && lv.has_landed)) { st = ra ? "LANDED " + fm(ra) : "LANDED"; cls = "ok"; }
+    else if (ea && sa && ea - sa >= 900) { st = "DELAYED " + fm(ea); cls = "warn"; }
+    else if (air || rd) st = "ETA " + fm(ea || sa);
+    else if (ea && sa && ea !== sa) st = "EXPECTED " + fm(ea);
+    else st = "SCHEDULED";
+    return { t: fm(ts), s: st, cls };
+  }
   _table(rows, kind, pfx) {
     if (rows === null) return `<div class="empty">Sensor not available</div>`;
     if (!rows.length) return `<div class="empty">${this._airline || this._window ? "No " + (this._airline ? this._esc(this._airline) + " " : "") + "flights in this window" : "No flights right now"}</div>`;
@@ -1809,7 +1827,8 @@ th .sorth.on { color:var(--fg); }
       const gt = hasG ? this._gateTiles : 0, tot = n.t + (ft ? 8 : n.c) + n.f + n.s + gt;
       tstyle = ` style="--wt:${(100 * n.t / tot).toFixed(2)}%;--wc:${(100 * (ft ? 4 : n.c) / tot).toFixed(2)}%;--wf:${(100 * n.f / tot).toFixed(2)}%;--ws:${(100 * n.s / tot).toFixed(2)}%;--wg:${(100 * gt / tot).toFixed(2)}%"`;
     }
-    const body = rows.map((r, i) => {
+    const body = rows.map((r0, i) => {
+      const r = ft ? Object.assign({}, r0, this._arrRow(r0, kind)) : r0;
       const rk = this._rk(r, (pfx || "") + kind + i);
       const gi = hasG ? this._gateOf(r) : null;
       if (flap) {

@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Tracked-only card: the Time and Status columns now describe the arrival, in the destination airport's local time (scheduled, EXPECTED, DELAYED, ETA, LANDED), whichever airport the flight was listed on. Not yet in the Raleigh style, which keeps its own layout.
 - Tracked-only card (`show: tracked`): separate **From** and **To** columns showing just the airport codes (ORD, SFO), taken from the flight's real route.
 - Pop-up: a **Track this flight** on/off switch. Switching on adds the flight to the tracking panel (and to a tracked-only main-dashboard card in the same browser); off removes it. Flights listed under `tracked_flights` in the YAML show as on and locked.
 - New `show: tracked`: a compact card with only your tracked flights (live status, times, gate, click for the pop-up), meant for the main dashboard. Shows just the column titles and the flight rows (no title, clock, Track box, TRACKING banner or footer; `tracked_controls: true` brings them back). With nothing to show the card hides itself completely. No board lists or filter dropdowns. Flights come from the Track flight box on any board card in the same browser, or from `tracked_flights` in the card YAML.

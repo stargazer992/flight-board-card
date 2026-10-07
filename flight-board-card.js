@@ -269,6 +269,16 @@ tr[data-rk] { cursor:pointer; }
 .pgrid { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px 14px; }
 .pgrid div { min-width:0; } .pgrid span { display:block; color:var(--sub); font-size:12px; } .pgrid b { font-size:17px; font-weight:700; }
 .pbig b { font-size:22px; }
+.gsigns { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px; margin:14px 0 4px; }
+.gcap { color:var(--sub); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
+.gsign { background:#fcc419; color:#111; border:3px solid #111; border-radius:6px; padding:8px 12px 9px; box-shadow:0 2px 8px rgba(0,0,0,.45); font-family:"Helvetica Neue",Arial,sans-serif; }
+.gs-main { display:flex; align-items:center; gap:12px; }
+.gs-lab { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.gs-ic { width:42px; height:42px; border:2.5px solid #111; padding:5px; box-sizing:border-box; }
+.gs-ic svg { width:100%; height:100%; fill:#111; display:block; }
+.gs-l { font-size:15px; font-weight:800; line-height:1; }
+.gs-g { font-size:56px; font-weight:900; line-height:1; letter-spacing:1px; flex:1; text-align:center; }
+.gs-sub { margin-top:6px; padding-top:5px; border-top:2px solid #111; font-size:15px; font-weight:800; letter-spacing:1px; text-transform:uppercase; display:flex; justify-content:space-between; gap:10px; }
 .pnote { color:var(--sub); font-size:13px; margin-top:12px; line-height:1.4; }
 .s { width:37%; font-weight:700; color:var(--st); }
 .s.ok { color:var(--ok); } .s.warn { color:var(--warn); } .s.bad { color:var(--bad); } .s.board { color:var(--brd); }
@@ -705,18 +715,25 @@ tr[data-rk] { cursor:pointer; }
       const nm = this._nm(pos.lat, pos.lon, Number(dla), Number(dlo));
       dist = Math.round(nm).toLocaleString("en-US") + " nm (" + Math.round(nm * 1.15078).toLocaleString("en-US") + " mi)";
     }
+    const sign = (cap, code, x, belt, kind) => {
+      if (!has(x.gate) && !has(x.term)) return "";
+      const bits = [has(x.term) ? "Terminal " + E(x.term) : "", belt && has(x.belt) ? "Belt " + E(x.belt) : ""].filter(b => b);
+      return `<div><div class="gcap">${E(cap)}${code ? " - " + E(code) : ""}</div><div class="gsign"><div class="gs-main"><div class="gs-lab"><div class="gs-ic">${this._icon(kind)}</div><div class="gs-l">Gate</div></div>` +
+        `<div class="gs-g">${E(has(x.gate) ? x.gate : "-")}</div></div>${bits.length ? `<div class="gs-sub">${bits.map(b => `<span>${b}</span>`).join("")}</div>` : ""}</div></div>`;
+    };
     const cell = (label, val, big) => has(val) ? `<div${big ? ' class="pbig"' : ""}><span>${E(label)}</span><b>${E(val)}</b></div>` : "";
-    const gcells = (x, belt) => cell("Gate", x.gate, true) + cell("Terminal", x.term) + (belt ? cell("Baggage belt", x.belt) : "");
     const model = pick(g("aircraft_model"), raw.aircraft_model), reg2 = pick(g("aircraft_registration"), raw.aircraft_registration);
     const title = r.fl || pop.code;
     const airline = pick(g("airline"), raw.airline, r.al) || "";
     const cls = r.cls === "ok" || r.cls === "warn" || r.cls === "bad" ? " " + r.cls : "";
     let h = `<div class="pcard"><button class="pclose" type="button" title="Close">&times;</button>`;
     h += `<div class="ptitle">${E(title)}</div><div class="psub">${E(airline)}${model ? " - " + E(model) : ""}${reg2 ? " - " + E(reg2) : ""}</div>`;
+    const signs = sign("Departure gate", o.code, og, false, "dep") + sign("Arrival gate", d.code, dg, true, "arr");
+    if (signs) h += `<div class="gsigns">${signs}</div>`;
     h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm">&#9992;</div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
     h += `<span class="pbadge${cls}">${E(r.s)}</span>${cd ? ` <span class="psub">${E(cd)}</span>` : ""}`;
-    h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}</h4><div class="pgrid">${cell("Time", tl(sd, ed, rd))}${gcells(og, false)}</div></div>`;
-    h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}</h4><div class="pgrid">${cell("Time", tl(sa, ea, ra))}${gcells(dg, true)}</div></div>`;
+    h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}</h4><div class="pgrid">${cell("Time", tl(sd, ed, rd))}</div></div>`;
+    h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}</h4><div class="pgrid">${cell("Time", tl(sa, ea, ra))}</div></div>`;
     if (pos) {
       const ago = pos.when ? " - " + this._dur(now - pos.when) + " ago" : "";
       h += `<div class="psec"><h4>Position - ${E(pos.src)}${E(ago)}</h4><div class="pgrid">` +

@@ -286,6 +286,7 @@ th .sorth.on { color:var(--fg); }
 .board.tiny:not(.raleigh) th { font-size:9px; letter-spacing:.2px; padding-left:3px; padding-right:3px; }
 .board.narrow:not(.raleigh):not(.london) .ph { letter-spacing:2px; font-size:calc(var(--fs) * .8); padding:8px 10px; white-space:nowrap; gap:8px; }
 .board.narrow.splitflap .ph { letter-spacing:2px; }
+.board.narrow.splitflap td { padding-left:4px; padding-right:4px; }
 .board.tiny:not(.raleigh):not(.london) .ph { letter-spacing:1px; font-size:calc(var(--fs) * .7); }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
@@ -947,6 +948,22 @@ th .sorth.on { color:var(--fg); }
     const fs = Number(this._config.font_size) || 22;
     const f = Math.max(9, Math.min(fs, ((p.clientWidth - 56) / (tot + (this._gateTiles || 0)) - 2) / 0.78));
     b.style.setProperty("--tfs", f.toFixed(1) + "px");
+    // Split-flap tiles must fit their columns (a phone with a Gate column is tight): each table
+    // shrinks on its own until nothing is cut off
+    if (this._theme === "splitflap") {
+      this.shadowRoot.querySelectorAll(".board.splitflap table").forEach(t => {
+        t.style.removeProperty("--tfs");
+        let g = f;
+        for (let i = 0; i < 10 && g > 6; i++) {
+          let over = false;
+          const tds = t.querySelectorAll("tr:nth-child(2) td");
+          for (let k = 0; k < tds.length; k++) if (tds[k].clientWidth && tds[k].scrollWidth > tds[k].clientWidth + 1) { over = true; break; }
+          if (!over) break;
+          g = g * 0.94;
+          t.style.setProperty("--tfs", g.toFixed(1) + "px");
+        }
+      });
+    }
     this._shorten();
     for (const k of ["t", "c", "f", "s"]) b.style.setProperty("--w" + k, (100 * n[k] / tot).toFixed(2) + "%");
   }

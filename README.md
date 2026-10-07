@@ -109,7 +109,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `time_format` | `24h` | `24h` (18:30) or `12h` (6:30 PM) |
 | `rows` | `12` | Number of flights shown in each list. Picking a time window on the card shows every flight in it (see `max_rows`) |
 | `font_size` | `22` | Base text size in pixels |
-| `show` | `both` | `both`, `departures` or `arrivals` |
+| `show` | `both` | `both`, `departures`, `arrivals`, or `tracked` (only your tracked flights, a compact card for the main dashboard) |
 | `layout` | `auto` | `auto` (side by side on wide screens) or `stacked` |
 | `past_minutes` | `15` | How long departed or landed flights stay on the board |
 | `show_airline` | `true` | Show the airline and airport code under the flight number and city |

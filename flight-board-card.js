@@ -458,16 +458,17 @@ th .sorth.on { color:var(--fg); }
   }
   _build() {
     const c = this._config;
-    const show = c.show === "departures" || c.show === "arrivals" ? c.show : "both";
+    const show = c.show === "departures" || c.show === "arrivals" || c.show === "tracked" ? c.show : "both";
+    const tro = show === "tracked";   // tracked flights only: no board lists and no filter dropdowns
     const colsCls = "cols" + (show !== "both" ? " one" : "") + (c.layout === "stacked" ? " stacked" : "");
     const dep = `<div class="panel"><div class="ph">${this._icon("dep")}Departures</div><div class="dep"></div></div>`;
     const arr = `<div class="panel"><div class="ph">${this._icon("arr")}Arrivals</div><div class="arr"></div></div>`;
     this.shadowRoot.innerHTML = `<style>${this._css()}</style>
 <div class="board">
   <div class="top"><div class="name"></div>
-    <div class="right">${c.show_airport_selector ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${this._alHtml()}${this._wnHtml()}${this._rnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}<div class="clock"></div></div></div>
+    <div class="right">${c.show_airport_selector && !tro ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${tro ? "" : this._alHtml() + this._wnHtml() + this._rnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}<div class="clock"></div></div></div>
   ${this._trkHtml()}
-  <div class="${colsCls}">${show !== "arrivals" ? dep : ""}${show !== "departures" ? arr : ""}</div>
+  <div class="${colsCls}"${tro ? ' style="display:none"' : ""}>${tro ? "" : (show !== "arrivals" ? dep : "") + (show !== "departures" ? arr : "")}</div>
   <div class="msg" style="display:none"></div>
   <div class="foot"></div>
   <div class="pop"></div>
@@ -1449,7 +1450,13 @@ th .sorth.on { color:var(--fg); }
     const all = this._trackedAll();
     const chips = root.querySelector(".trkchips");
     if (chips) chips.innerHTML = all.map(o => `<span class="trkchip">${this._esc(o.code)}${o.extra ? `<span class="trkx" data-rm="${this._esc(o.code)}" title="Stop tracking">&times;</span>` : ""}</span>`).join("");
-    if (!all.length || !this._hass) { trk.innerHTML = ""; trk.className = "trk"; if (this._gateTiles) { this._gateTiles = 0; this._fit(); } return; }
+    if (!all.length || !this._hass) {
+      // On a tracked-only card an empty panel would look broken: say what to do
+      trk.innerHTML = this._config.show === "tracked" && this._hass ? `<div class="trknf"><b>No flights tracked.</b>Track a flight on the board card (same browser), or list them under <code>tracked_flights</code> in this card's YAML.</div>` : "";
+      trk.className = this._config.show === "tracked" ? "trk trkcols one" : "trk";
+      if (this._gateTiles) { this._gateTiles = 0; this._fit(); }
+      return;
+    }
     const dep = this._trackRows(this._config.departures_entity, "dep");
     const arr = this._trackRows(this._config.arrivals_entity, "arr");
     // Flights that are not on the airport board come from the integration's additional tracked sensor
@@ -1870,7 +1877,7 @@ th .sorth.on { color:var(--fg); }
       root.querySelector(".foot").textContent = "";
       return;
     }
-    cols.style.display = ""; msg.style.display = "none";
+    cols.style.display = this._config.show === "tracked" ? "none" : ""; msg.style.display = "none";
     if (apb) apb.style.display = this._hass.states[this._config.airport_entity] ? "" : "none";
     const apIn = root.querySelector("input.apin");
     if (apIn) apIn.placeholder = "Search airport (now " + (this._ap().iata || this._ap().icao || "-") + ")";
@@ -1885,7 +1892,7 @@ th .sorth.on { color:var(--fg); }
         return;
       }
     }
-    const title = this._config.title || this._ap().name;
+    const title = this._config.title || (this._config.show === "tracked" ? "Tracked flights" : this._ap().name);
     root.querySelector(".name").innerHTML = `${this._esc(title)}<small>${this._esc(this._ap().iata)}</small>`;
     this._rowReg = {};
     const dep = root.querySelector(".dep"), arr = root.querySelector(".arr");
@@ -1922,7 +1929,7 @@ const FBC_SCHEMA = [
   { type: "grid", name: "", schema: [
     { name: "time_zone_mode", selector: { select: { mode: "dropdown", options: [{ value: "airport", label: "Each airport's local time" }, { value: "board", label: "Board airport's time" }] } } },
     { name: "time_format", selector: { select: { mode: "dropdown", options: [{ value: "24h", label: "24-hour (18:30)" }, { value: "12h", label: "12-hour (6:30 PM)" }] } } },
-    { name: "show", selector: { select: { mode: "dropdown", options: [{ value: "both", label: "Departures and arrivals" }, { value: "departures", label: "Departures only" }, { value: "arrivals", label: "Arrivals only" }] } } },
+    { name: "show", selector: { select: { mode: "dropdown", options: [{ value: "both", label: "Departures and arrivals" }, { value: "departures", label: "Departures only" }, { value: "arrivals", label: "Arrivals only" }, { value: "tracked", label: "Tracked flights only (for the main dashboard)" }] } } },
   ] },
   { name: "font_size", selector: { number: { min: 12, max: 40, step: 1, mode: "slider" } } },
   { name: "rows", selector: { number: { min: 3, max: 30, step: 1, mode: "slider" } } },

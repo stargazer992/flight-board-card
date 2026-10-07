@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
-- New `show: tracked`: a compact card with only your tracked flights (live status, times, gate, click for the pop-up), meant for the main dashboard. Shows just the flight bar(s) (no title, clock, Track box, banner, column titles or footer; `tracked_controls: true` brings them back). No board lists or filter dropdowns. Flights come from the Track flight box on any board card in the same browser, or from `tracked_flights` in the card YAML.
+- New `show: tracked`: a compact card with only your tracked flights (live status, times, gate, click for the pop-up), meant for the main dashboard. Shows just the tracking panel with its banner and column titles (no title, clock, Track box or footer; `tracked_controls: true` brings them back). No board lists or filter dropdowns. Flights come from the Track flight box on any board card in the same browser, or from `tracked_flights` in the card YAML.
 - Time zones: the flight pop-up shows departure times in the origin airport's local time and arrival times in the destination's, with the zone name (CDT, PDT). A **Times** button in the pop-up switches to the board airport's time for everything; the choice is remembered per device. New option `time_zone_mode` (`airport` or `board`). The board lists stay in the board airport's time.
 - Auto rows now go up to 250 (was 60) so a long time window shows every flight; the Rows dropdown also offers 100 and 200.
 - Pop-up: the plane emoji between the airports is now a clean dashed arrow, and times show as tidy Scheduled / Actual (or Estimated) cells instead of one long line.

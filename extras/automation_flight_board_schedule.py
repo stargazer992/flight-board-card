@@ -68,6 +68,22 @@ FR24_URL = "https://api.flightradar24.com/common/v1/flight/list.json?query={quer
 BROWSER_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 FETCH_TIMEOUT_SECONDS = 15
 
+# Flight detail endpoint (the flight list leaves gate, terminal and belt empty,
+# the detail view of a single flight has them). Used for the chosen flight only.
+FR24_DETAIL_URL = "https://data-live.flightradar24.com/clickhandler/?version=1.5&flight={flight_id}"
+
+# Second gate source (optional): AeroDataBox through RapidAPI. It lists gate,
+# terminal and baggage belt per flight. Subscribe to the free plan at
+# https://rapidapi.com/aedbx-aedbx/api/aerodatabox and paste your key here.
+# Leave the key empty to switch it off. It is only asked when Flightradar24 has no
+# gate, for flights leaving or landing within ADB_WINDOW_HOURS, and at most once
+# per ADB_CACHE_SECONDS per flight (the free plan has a small monthly quota).
+AERODATABOX_API_KEY = ""
+AERODATABOX_HOST = "aerodatabox.p.rapidapi.com"
+AERODATABOX_URL = "https://aerodatabox.p.rapidapi.com/flights/number/{number}/{date}?withAircraftImage=false&withLocation=false"
+ADB_WINDOW_HOURS = 8
+ADB_CACHE_SECONDS = 1800
+
 # A flight is looked up at most once per this many seconds
 CACHE_SECONDS = 900
 
@@ -108,6 +124,7 @@ SCHEDULE_STATE = {
     "last_notify": 0,
     "cache": {},       # code -> {"at": ts, "leg": dict or None}
     "os_cache": {},    # code -> {"at": ts, "data": dict or None}
+    "adb_cache": {},   # code -> {"at": ts, "fields": dict}
     "watch": {},       # code -> expiry timestamp (asked by the card)
     "token": {"value": "", "expires": 0},
     "busy": False,
@@ -199,6 +216,7 @@ def fb_sched_http_json(url, headers=None, data=None):
 def fb_sched_leg(item):
     # Turn one Flightradar24 flight list entry into the attribute layout the card uses.
     return {
+        "flight_id": fb_sched_get(item, ["identification", "id"]),
         "flight_number": fb_sched_get(item, ["identification", "number", "default"]),
         "callsign": fb_sched_get(item, ["identification", "callsign"]),
         "aircraft_registration": fb_sched_get(item, ["aircraft", "registration"]),
@@ -267,6 +285,86 @@ def fb_sched_pick(legs, now):
     return best
 
 
+def fb_sched_add_details(leg):
+    # The flight list usually has no gate, terminal or belt. When a gate is missing,
+    # ask the detail view of this one flight and fill them in. A failure here
+    # only logs a warning: the leg is still published without gate data.
+    keys = ["gate", "terminal", "baggage"]
+    flight_id = leg.get("flight_id")
+    if not flight_id:
+        return
+    # Nothing to add when both gates are already known
+    if leg.get("airport_origin_gate") and leg.get("airport_destination_gate"):
+        return
+    try:
+        payload = fb_sched_http_json(FR24_DETAIL_URL.replace("{flight_id}", str(flight_id)))
+        for side in ["origin", "destination"]:
+            for k in keys:
+                value = fb_sched_clean(fb_sched_get(payload, ["airport", side, "info", k]))
+                if value:
+                    leg["airport_" + side + "_" + k] = value
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: gate details for {leg.get('flight_number')} failed: {e}")
+
+
+def fb_sched_add_aerodatabox(code, leg):
+    # Second gate source. Fills gate, terminal and belt that are still empty.
+    # A failure only logs a warning: the leg is published without those values.
+    if not AERODATABOX_API_KEY or leg is None:
+        return
+    number = fb_sched_norm(leg.get("flight_number") or code)
+    dep = leg.get("time_scheduled_departure")
+    arr = leg.get("time_scheduled_arrival")
+    if not number or not dep:
+        return
+    now = time.time()
+    near = abs(dep - now) < ADB_WINDOW_HOURS * 3600
+    if arr is not None and abs(arr - now) < ADB_WINDOW_HOURS * 3600:
+        near = True
+    if not near:
+        return
+    cache = SCHEDULE_STATE["adb_cache"]
+    entry = cache.get(code)
+    fields = None
+    if entry is not None and now - entry["at"] < ADB_CACHE_SECONDS:
+        fields = entry["fields"]
+    else:
+        fields = {}
+        try:
+            day = time.strftime("%Y-%m-%d", time.gmtime(dep))
+            url = AERODATABOX_URL.replace("{number}", number).replace("{date}", day)
+            payload = fb_sched_http_json(
+                url,
+                headers={"X-RapidAPI-Key": AERODATABOX_API_KEY, "X-RapidAPI-Host": AERODATABOX_HOST},
+            )
+            items = payload if isinstance(payload, list) else []
+            want_o = leg.get("airport_origin_code_iata")
+            want_d = leg.get("airport_destination_code_iata")
+            hit = None
+            for item in items:
+                o = fb_sched_get(item, ["departure", "airport", "iata"])
+                d = fb_sched_get(item, ["arrival", "airport", "iata"])
+                if o == want_o and d == want_d:
+                    hit = item
+                    break
+            if hit is None and len(items) == 1:
+                hit = items[0]
+            if hit is not None:
+                fields = {
+                    "airport_origin_gate": fb_sched_clean(fb_sched_get(hit, ["departure", "gate"])),
+                    "airport_origin_terminal": fb_sched_clean(fb_sched_get(hit, ["departure", "terminal"])),
+                    "airport_destination_gate": fb_sched_clean(fb_sched_get(hit, ["arrival", "gate"])),
+                    "airport_destination_terminal": fb_sched_clean(fb_sched_get(hit, ["arrival", "terminal"])),
+                    "airport_destination_baggage": fb_sched_clean(fb_sched_get(hit, ["arrival", "baggageBelt"])),
+                }
+        except Exception as e:
+            log.warning(f"{LOG_PREFIX}: AeroDataBox lookup for {code} failed: {e}")
+        cache[code] = {"at": now, "fields": fields}
+    for key in fields:
+        if fields[key] and not leg.get(key):
+            leg[key] = fields[key]
+
+
 def fb_sched_fetch(code):
     # Download the flight list for one flight number and return the best leg (dict) or None.
     # Raises on network or parse errors so the caller can log and keep the old data.
@@ -281,7 +379,11 @@ def fb_sched_fetch(code):
             legs.append(fb_sched_leg(item))
         except Exception as e:
             log.warning(f"{LOG_PREFIX}: skipped a malformed leg for {code}: {e}")
-    return fb_sched_pick(legs, time.time())
+    best = fb_sched_pick(legs, time.time())
+    if best is not None:
+        fb_sched_add_details(best)
+        fb_sched_add_aerodatabox(code, best)
+    return best
 
 
 # ---------------------------- OpenSky ---------------------------------------

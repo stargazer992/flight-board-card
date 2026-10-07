@@ -3,7 +3,7 @@
 ## 1.10.0 (fork)
 - Click any flight on the board to open a details pop-up: aircraft, scheduled, estimated and actual times, gate, terminal and baggage belt at both airports, live position, altitude, speed, heading, vertical rate, distance to the destination and a countdown to landing or departure. Options `flight_popup`, `lookup_service`.
 - Gate column (gate, terminal, belt) in the tracking panels. Option `show_gate`.
-- Companion script now also reads gate, terminal and belt from Flightradar24, adds live position from OpenSky Network (optional account, `OPENSKY_*` settings) and has a `pyscript.flight_board_lookup` service that the card calls when you open a pop-up. It now covers flights that are already airborne too.
+- Companion script now also reads gate, terminal and belt from Flightradar24, adds live position from OpenSky Network (optional account, `OPENSKY_*` settings) and has a `pyscript.flight_board_lookup` service that the card calls when you open a pop-up. It now covers flights that are already airborne too. Gates come from Flightradar24's per-flight detail view, with an optional AeroDataBox key as a second source.
 
 ## 1.9.0 (fork)
 - Optional schedule sensor (`schedule_entity`): flights that are not airborne yet show their route and scheduled time, with the date when it is not today. New companion PyScript in `extras/automation_flight_board_schedule.py`.

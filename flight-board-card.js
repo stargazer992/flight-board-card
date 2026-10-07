@@ -377,6 +377,10 @@ th .sorth.on { color:var(--fg); }
 .board.mini { padding:0 !important; background:transparent !important; box-shadow:none !important; border:0 !important; }
 .board.mini .top, .board.mini .trkbar, .board.mini .foot { display:none !important; }
 .board.mini .trkcols { margin-bottom:0; }
+/* Split-flap tracking panel: plain black and white, no yellow highlight */
+.board.splitflap .trk tr.trkd td { box-shadow:none !important; }
+.board.splitflap .trk tr.trkd td:first-child { border-left:0 !important; }
+.board.splitflap .trk td, .board.splitflap .trk td .ch, .board.splitflap .trk td.s.warn .ch, .board.splitflap .trk td.s.ok .ch, .board.splitflap .trk td.s.bad .ch { color:#fff !important; }
 .board.mini .trk .ph { display:none !important; }
 .foot { color:var(--sub); font-size:calc(var(--fs) * .55); margin:10px 4px 0; text-align:right; }
 

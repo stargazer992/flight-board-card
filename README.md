@@ -26,7 +26,7 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
   - **Split-flap**: every letter on its own flap, letters flip when something changes
   - **Digital flaps**: modern flap-look panels
   - **Amsterdam style**: dark blue and yellow, clean and very readable
-  - **London style**: black and yellow
+  - **London style**: Heathrow-inspired black and yellow, with a Gate and Belt column
   - **LED dot-matrix**: glowing amber retro display
 - Airport search on the card: type a name, city, IATA or ICAO code and pick from about 8,000 airports worldwide, with no setup or API key needed
 - A short list of favourite airports is shown when you tap the search field. Use the built-in list or set your own.
@@ -127,6 +127,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `schedule_entity` | `sensor.flight_board_schedule` | Optional sensor with the schedule of flights that are not airborne yet (see below) |
 | `show_gate` | `true` | Show a Gate column (gate, terminal, baggage belt) in the tracking panels. Needs the companion script |
 | `flight_popup` | `true` | Click any flight on the board to open a details pop-up (times, gate, baggage belt, position, altitude, time to landing) |
+| `gates_entity` | `sensor.flight_board_gates` | London style only: sensor with the gate (departures) and baggage belt (arrivals) of every flight on the board. Published by the companion script |
 | `lookup_service` | `pyscript.flight_board_lookup` | Service of the companion script that the card calls to look up a flight |
 | `tracked_flights` | (none) | Flight numbers always tracked, for example `[AA1234, DL567]`. Flights added on the card are saved on that device and can be removed with the x |
 | `hide_private` | `true` | Hide private, charter and general-aviation flights (flights without an airline IATA code) |
@@ -183,6 +184,7 @@ tracked_flights:
 **Gate, baggage belt and live position (optional, same script).** The same script also reads the departure and arrival gate, terminal and baggage belt from Flightradar24, and the live position (latitude, longitude, altitude, speed, heading, vertical rate) from [OpenSky Network](https://opensky-network.org/) as a second source. Both are published in `sensor.flight_board_schedule`. The card shows them in a Gate column in the tracking panels and in the flight pop-up (click any flight on the board). When you open a pop-up the card asks the script to look that flight up (`pyscript.flight_board_lookup`), and the data appears within a few seconds.
 
 - Gates are often empty until a few hours before departure, and some airports never publish them. Empty values are simply not shown.
+- The script also publishes `sensor.flight_board_gates` (gate for every departure, belt for every arrival at your airport). The London style shows it as a Gate / Belt column.
 - The Flightradar24 flight list has no gates, so the script reads them from two other Flightradar24 sources: the airport board of the airport the card shows (flights that have not departed yet, refreshed every 10 minutes) and the detail view of a single flight (flights in the air). If that is empty too, an optional second source is [AeroDataBox](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) (free RapidAPI plan): paste your key into `AERODATABOX_API_KEY` at the top of the script. It is only asked for flights within 8 hours of departure or landing and at most every 30 minutes per flight.
 - OpenSky works without an account (about 400 requests a day). For more, create a free API client on opensky-network.org and put the client id and secret at the top of the script. Set `OPENSKY_ENABLED = False` to switch it off.
 - OpenSky only knows aircraft its receivers hear, and it is only asked about flights that are in the air.

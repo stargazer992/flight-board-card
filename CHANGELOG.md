@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- London style redone after the Heathrow boards: yellow banner with a black plane disc, pale header strip, yellow destinations and gates, white times and flight numbers, green Boarding, red Cancelled, and wording like "On time" and "Delayed to 12:20". New Gate column (departures) and Belt column (arrivals) for every flight, from the new `sensor.flight_board_gates` published by the companion script (option `gates_entity`).
 - Click any flight on the board to open a details pop-up: aircraft, scheduled, estimated and actual times, gate, terminal and baggage belt at both airports, live position, altitude, speed, heading, vertical rate, distance to the destination and a countdown to landing or departure. Gate and terminal sit at the top of the pop-up in a compact yellow airport-sign block with black letters: the arrival gate (with baggage belt) for an arrival, the departure gate for a departure. Options `flight_popup`, `lookup_service`.
 - Gate column (gate, terminal, belt) in the tracking panels. Option `show_gate`.
 - Companion script now also reads gate, terminal and belt from Flightradar24, adds live position from OpenSky Network (optional account, `OPENSKY_*` settings) and has a `pyscript.flight_board_lookup` service that the card calls when you open a pop-up. It now covers flights that are already airborne too. Gates come from the Flightradar24 airport board (flights that have not departed yet) and the per-flight detail view (flights in the air), with an optional AeroDataBox key as a further source.

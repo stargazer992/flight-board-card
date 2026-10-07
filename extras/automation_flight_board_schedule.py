@@ -81,6 +81,13 @@ FR24_BOARD_URL = "https://api.flightradar24.com/common/v1/airport.json?code={cod
 # Entity that holds the airport the card shows (Flightradar24 integration)
 HOME_AIRPORT_ENTITY = "text.flightradar24_airport_track"
 BOARD_CACHE_SECONDS = 600
+
+# Gate sensor for the card's London style: gate (departures) and baggage belt
+# (arrivals) of every flight on the airport board, in one small sensor.
+PUBLISH_BOARD_GATES = True
+GATES_SENSOR = "sensor.flight_board_gates"
+GATES_NAME = "Flight board gates"
+GATES_ICON = "mdi:gate"
 # A board entry only matches a flight when its scheduled departure is within this many seconds
 BOARD_MATCH_SECONDS = 6 * 3600
 
@@ -357,6 +364,53 @@ def fb_sched_board(code, mode):
             log.warning(f"{LOG_PREFIX}: skipped a malformed board row: {e}")
     cache[key] = {"at": now, "items": items}
     return items
+
+
+def fb_sched_publish_gates():
+    # Publish gate (departures) and belt (arrivals) for the whole airport board in
+    # GATES_SENSOR as {flight number: [gate, terminal, belt]}. Never raises.
+    if not PUBLISH_BOARD_GATES:
+        return True
+    try:
+        home = None
+        try:
+            home = state.get(HOME_AIRPORT_ENTITY)
+        except Exception:
+            home = None
+        home = fb_sched_norm(home)
+        if not home or home in ("UNKNOWN", "UNAVAILABLE"):
+            return True
+        out = {"departures": {}, "arrivals": {}}
+        for mode, side in [("departures", "origin"), ("arrivals", "destination")]:
+            items = fb_sched_board(home, mode)
+            for number in items:
+                entries = items[number]
+                if not entries:
+                    continue
+                fields = entries[0]["fields"]
+                row = [
+                    fields.get("airport_" + side + "_gate"),
+                    fields.get("airport_" + side + "_terminal"),
+                    fields.get("airport_" + side + "_baggage"),
+                ]
+                if row[0] or row[1] or row[2]:
+                    out[mode][number] = row
+        state.set(
+            GATES_SENSOR,
+            value=len(out["departures"]) + len(out["arrivals"]),
+            new_attributes={
+                "departures": out["departures"],
+                "arrivals": out["arrivals"],
+                "airport": home,
+                "icon": GATES_ICON,
+                "friendly_name": GATES_NAME,
+                "source": "flightradar24 airport board",
+            },
+        )
+        return True
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: could not publish {GATES_SENSOR}: {e}")
+        return False
 
 
 def fb_sched_add_board_gates(leg):
@@ -728,10 +782,17 @@ def fb_sched_rebuild():
         fb_sched_notify_error(f"Failed publishing {OUT_SENSOR}: {e}")
         return
 
+    gates_ok = fb_sched_publish_gates()
+
     if failures:
         fb_sched_notify_error(
             "Could not get the schedule from Flightradar24 for: " + ", ".join(failures)
             + ". Flightradar24 may be blocking or have changed the endpoint. Check the log."
+        )
+    elif not gates_ok:
+        fb_sched_notify_error(
+            "Could not read the Flightradar24 airport board for the gate sensor "
+            + GATES_SENSOR + ". Flightradar24 may be blocking or have changed the endpoint. Check the log."
         )
     elif os_failures:
         fb_sched_notify_error(

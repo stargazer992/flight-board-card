@@ -19,8 +19,9 @@
 #     flight page uses. Gate, terminal and belt come from the Flightradar24 flight
 #     detail view (flights in the air) and from the airport board of the airport
 #     the card shows (flights that have not departed yet).
-#   - OpenSky is only asked for flights that are airborne, at most once per
-#     OPENSKY_REFRESH_SECONDS per flight.
+#   - OpenSky is only asked for flights that are airborne, in one request for all
+#     of them, at most once per OPENSKY_REFRESH_SECONDS. When OpenSky answers
+#     "too many requests" (429) the script pauses OpenSky and keeps the last position.
 #   - Results are cached so Flightradar24 is asked at most once per CACHE_SECONDS.
 #
 # OPENSKY ACCOUNT (optional)
@@ -43,6 +44,7 @@
 
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -112,9 +114,13 @@ OPENSKY_CLIENT_ID = ""
 OPENSKY_CLIENT_SECRET = ""
 OPENSKY_STATES_URL = "https://opensky-network.org/api/states/all"
 OPENSKY_TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-# Seconds between OpenSky requests for the same flight. Anonymous use has about
-# 400 requests a day, so keep this at 120 or more unless you added an account.
-OPENSKY_REFRESH_SECONDS = 120
+# Seconds between OpenSky requests. All airborne flights are asked in ONE request,
+# so this is the number of seconds between requests. Anonymous use has about 400
+# credits a day, so keep this at 300 or more unless you added an account.
+OPENSKY_REFRESH_SECONDS = 300
+# When OpenSky answers "too many requests" (HTTP 429), stop asking for this many
+# seconds (OpenSky's own wait time is used when it sends one)
+OPENSKY_BACKOFF_SECONDS = 1800
 # When the aircraft id (icao24) is unknown, search a box this many degrees wide
 # around its last known position instead
 OPENSKY_BOX_DEGREES = 0.6
@@ -147,6 +153,7 @@ SCHEDULE_STATE = {
     "board_cache": {}, # "airport|mode" -> {"at": ts, "items": {flight number: [entries]}}
     "watch": {},       # code -> expiry timestamp (asked by the card)
     "token": {"value": "", "expires": 0},
+    "os_block_until": 0,  # OpenSky said "too many requests": do not ask before this time
     "busy": False,
 }
 
@@ -620,6 +627,37 @@ def fb_sched_os_fetch(code, icao24, lat, lon, callsigns):
     return None
 
 
+def fb_sched_os_batch(icaos):
+    # One request for many aircraft: returns {icao24: os_* fields}. Raises on errors.
+    out = {}
+    if not icaos:
+        return out
+    query = urllib.parse.urlencode([("icao24", str(i).lower()) for i in icaos])
+    payload = fb_sched_http_json(OPENSKY_STATES_URL + "?" + query, headers=fb_sched_os_headers())
+    states = payload.get("states") if isinstance(payload, dict) else None
+    for row in states or []:
+        try:
+            out[str(row[0]).lower()] = fb_sched_os_state(row)
+        except Exception:
+            continue
+    return out
+
+
+def fb_sched_os_wait(err):
+    # Seconds to wait when OpenSky answered "too many requests" (HTTP 429), else 0
+    try:
+        if isinstance(err, urllib.error.HTTPError) and err.code == 429:
+            wait = 0
+            try:
+                wait = int(float(err.headers.get("X-Rate-Limit-Retry-After-Seconds") or 0))
+            except Exception:
+                wait = 0
+            return max(wait, 60) if wait else OPENSKY_BACKOFF_SECONDS
+    except Exception:
+        pass
+    return 0
+
+
 def fb_sched_airborne(leg, hint):
     # True when the flight is in the air (OpenSky is only asked for those)
     if hint and hint.get("lat") is not None:
@@ -704,43 +742,84 @@ def fb_sched_rebuild():
             if entry is not None:
                 cache[code] = {"at": now - CACHE_SECONDS + 60, "leg": entry["leg"]}
 
-        # ---- OpenSky: live position (airborne flights only) ----
-        if not OPENSKY_ENABLED:
-            continue
-        oentry = None
+    # ---- OpenSky: live position (airborne flights only), one request for all ----
+    if OPENSKY_ENABLED:
         try:
-            leg_now = None
-            if cache.get(code) is not None:
-                leg_now = cache[code]["leg"]
-            hint = hints.get(code)
-            if not fb_sched_airborne(leg_now, hint):
-                os_cache.pop(code, None)
-                continue
-            oentry = os_cache.get(code)
-            if oentry is not None and now - oentry["at"] < OPENSKY_REFRESH_SECONDS:
-                continue
-            icao24 = None
-            lat = None
-            lon = None
-            callsigns = [code]
-            if hint:
-                icao24 = hint.get("icao24")
-                lat = hint.get("lat")
-                lon = hint.get("lon")
-                if hint.get("callsign"):
-                    callsigns.append(hint["callsign"])
-            if leg_now:
-                if not icao24:
-                    icao24 = leg_now.get("aircraft_hex")
-                if leg_now.get("callsign"):
-                    callsigns.append(fb_sched_norm(leg_now["callsign"]))
-            data = fb_sched_os_fetch(code, icao24, lat, lon, callsigns)
-            os_cache[code] = {"at": now, "data": data}
+            blocked = SCHEDULE_STATE["os_block_until"] - now
+            todo = []          # (code, icao24, lat, lon, callsigns)
+            for code in codes:
+                try:
+                    leg_now = None
+                    if cache.get(code) is not None:
+                        leg_now = cache[code]["leg"]
+                    hint = hints.get(code)
+                    if not fb_sched_airborne(leg_now, hint):
+                        os_cache.pop(code, None)
+                        continue
+                    oentry = os_cache.get(code)
+                    if oentry is not None and now - oentry["at"] < OPENSKY_REFRESH_SECONDS:
+                        continue
+                    icao24 = None
+                    lat = None
+                    lon = None
+                    callsigns = [code]
+                    if hint:
+                        icao24 = hint.get("icao24")
+                        lat = hint.get("lat")
+                        lon = hint.get("lon")
+                        if hint.get("callsign"):
+                            callsigns.append(hint["callsign"])
+                    if leg_now:
+                        if not icao24:
+                            icao24 = leg_now.get("aircraft_hex")
+                        if leg_now.get("callsign"):
+                            callsigns.append(fb_sched_norm(leg_now["callsign"]))
+                    todo.append((code, icao24, lat, lon, callsigns))
+                except Exception as e:
+                    log.warning(f"{LOG_PREFIX}: OpenSky preparation for {code} failed: {e}")
+            if todo and blocked > 0:
+                # OpenSky asked us to slow down: keep the last position we had
+                pass
+            elif todo:
+                known = [t[1] for t in todo if t[1]]
+                found = {}
+                try:
+                    found = fb_sched_os_batch(known)
+                    for t in todo:
+                        if t[1]:
+                            data = found.get(str(t[1]).lower())
+                            os_cache[t[0]] = {"at": now, "data": data}
+                    # Aircraft without an id: search a box around the last known position
+                    for t in todo:
+                        if not t[1]:
+                            try:
+                                os_cache[t[0]] = {"at": now, "data": fb_sched_os_fetch(t[0], None, t[2], t[3], t[4])}
+                            except Exception as e:
+                                if fb_sched_os_wait(e):
+                                    raise
+                                log.warning(f"{LOG_PREFIX}: OpenSky lookup for {t[0]} failed: {e}")
+                                os_failures.append(t[0])
+                                old = os_cache.get(t[0])
+                                if old is not None:
+                                    os_cache[t[0]] = {"at": now - OPENSKY_REFRESH_SECONDS + 60, "data": old["data"]}
+                except Exception as e:
+                    wait = fb_sched_os_wait(e)
+                    if wait:
+                        SCHEDULE_STATE["os_block_until"] = now + wait
+                        log.warning(
+                            f"{LOG_PREFIX}: OpenSky says too many requests (HTTP 429). Pausing OpenSky for "
+                            f"{int(wait / 60)} minutes and keeping the last known positions. "
+                            "A free OpenSky account raises the daily limit a lot (see the top of this file)."
+                        )
+                    else:
+                        log.warning(f"{LOG_PREFIX}: OpenSky request failed: {e}")
+                    for t in todo:
+                        os_failures.append(t[0])
+                        old = os_cache.get(t[0])
+                        if old is not None:
+                            os_cache[t[0]] = {"at": now - OPENSKY_REFRESH_SECONDS + 60, "data": old["data"]}
         except Exception as e:
-            log.warning(f"{LOG_PREFIX}: OpenSky lookup for {code} failed: {e}")
-            os_failures.append(code)
-            if oentry is not None:
-                os_cache[code] = {"at": now - OPENSKY_REFRESH_SECONDS + 60, "data": oentry["data"]}
+            log.warning(f"{LOG_PREFIX}: OpenSky step failed: {e}")
 
     try:
         # Only publish flights that are still wanted

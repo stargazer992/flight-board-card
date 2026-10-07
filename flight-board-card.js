@@ -150,6 +150,17 @@ class FlightBoardCard extends HTMLElement {
     const cfgRn = Math.max(1, Number(this._config.rows) || 12);
     if (savedRn !== null && Number(savedRn) > 0) { this._rowsN = Number(savedRn); this._rowsAuto = false; }
     else { this._rowsN = cfgRn; this._rowsAuto = true; }
+    // Sort order: saved choice on this device (clicked column header) wins, then the sort option
+    this._sortKey = "time"; this._sortDir = 1; this._sortSave = "flight-board-card-sort";
+    const sk = ["time", "city", "airline", "flight", "gate", "status"];
+    const cfgSort = String(this._config.sort || "time").toLowerCase();
+    if (sk.indexOf(cfgSort) >= 0) this._sortKey = cfgSort;
+    let savedSort = null;
+    try { savedSort = localStorage.getItem(this._sortSave); } catch (e) {}
+    if (savedSort) {
+      const ps = String(savedSort).split(":");
+      if (sk.indexOf(ps[0]) >= 0) { this._sortKey = ps[0]; this._sortDir = ps[1] === "-1" ? -1 : 1; }
+    }
     this._apc = null;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._built = false;
@@ -371,6 +382,9 @@ tr[data-rk] { cursor:pointer; }
 .board.raleigh .ph { background:var(--himg, none) left center / cover no-repeat, var(--hbg); min-height:var(--hmin, 0); box-sizing:border-box; text-transform:uppercase; letter-spacing:1px; font-weight:800; font-size:calc(var(--fs) + 8px); padding:10px 16px; justify-content:flex-end; text-shadow:0 2px 3px rgba(0,30,80,.55); }
 .board.raleigh .ph svg { filter:drop-shadow(0 1px 2px rgba(0,30,80,.6)); }
 .board.raleigh th { background:#e6ebf3; color:#56627a; text-transform:uppercase; letter-spacing:.8px; font-weight:700; font-size:calc(var(--fs) * .5); padding:4px 8px; border-bottom:1px solid #cfd6e2; }
+.board.raleigh th .sorth { cursor:pointer; user-select:none; -webkit-user-select:none; padding:2px 0; }
+.board.raleigh th .sorth:hover { color:#10376f; text-decoration:underline; }
+.board.raleigh th .sorth.on { color:#10376f; }
 .board.raleigh td { padding:6px 8px; font-size:calc(var(--fs) * .8); border-bottom:1px solid var(--line2); color:var(--st); }
 .board.raleigh td.rc { width:35%; }
 .board.raleigh td.rc b.cod { display:none; }
@@ -523,6 +537,20 @@ tr[data-rk] { cursor:pointer; }
         if (cur && cur.extra) this._removeTrack(code);
         else if (!cur) this._addTrack(code);
         this._trList();
+      });
+    }
+    if (!this._sortWired) {
+      this._sortWired = true;
+      this.shadowRoot.addEventListener("click", (e) => {
+        const h = e.target && e.target.closest ? e.target.closest(".sorth") : null;
+        if (!h) return;
+        const k = h.getAttribute("data-sk");
+        if (!k) return;
+        // Same column again flips the direction; a new column starts A-Z / earliest first
+        if (this._sortKey === k) this._sortDir = this._sortDir === -1 ? 1 : -1;
+        else { this._sortKey = k; this._sortDir = 1; }
+        try { localStorage.setItem(this._sortSave, this._sortKey + ":" + this._sortDir); } catch (err) {}
+        this._render();
       });
     }
     const wb = this.shadowRoot.querySelector(".wnbtn");
@@ -921,11 +949,12 @@ tr[data-rk] { cursor:pointer; }
       }
       t.classList.toggle("codes", on && mode !== "never");
       // A-Z order follows what is shown: by airport code when codes are on, by city name otherwise
-      if (String(this._config.sort || "time").toLowerCase() === "city") {
+      if (this._sortKey === "city") {
         const sel = t.classList.contains("codes") ? "td.rc b.cod" : "td.rc b.cty";
         const trs = Array.from(t.querySelectorAll("tr")).filter(tr => tr.querySelector("td.rc"));
         const key = (tr) => { const e = tr.querySelector(sel); return e ? e.textContent : ""; };
-        const sorted = trs.map((tr, i) => ({ tr, i })).sort((x, y) => key(x.tr).localeCompare(key(y.tr)) || x.i - y.i);
+        const dirc = this._sortDir === -1 ? -1 : 1;
+        const sorted = trs.map((tr, i) => ({ tr, i })).sort((x, y) => (key(x.tr).localeCompare(key(y.tr)) * dirc) || x.i - y.i);
         const same = sorted.every((o, i) => o.tr === trs[i]);
         if (!same) sorted.forEach(o => o.tr.parentNode.appendChild(o.tr));
       }
@@ -1016,6 +1045,34 @@ tr[data-rk] { cursor:pointer; }
     } catch (e) {}
     return m;
   }
+  // Sort the rows on the column chosen in the table header (time, city, airline, flight, gate, status)
+  _sortRows(rows) {
+    const key = this._sortKey || "time", dir = this._sortDir === -1 ? -1 : 1;
+    if (key === "time" && dir === 1) return rows;
+    const nat = (x, y) => String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
+    const val = (r) => {
+      if (key === "city") return r.c;
+      if (key === "airline") return r.al;
+      if (key === "flight") return r.fl;
+      if (key === "status") return this._rdStatus(r).t;
+      if (key === "gate") { try { return this._boardGate(r) || ""; } catch (e) { return ""; } }
+      return "";
+    };
+    rows.forEach((r, i) => { r._i = i; });
+    rows.sort((x, y) => {
+      let c;
+      if (key === "time") c = (Number(x.ts) || 0) - (Number(y.ts) || 0);
+      else {
+        const vx = val(x), vy = val(y);
+        // blanks (no gate yet) always go last
+        if (!vx && vy) return 1;
+        if (vx && !vy) return -1;
+        c = nat(vx, vy);
+      }
+      return c * dir || x._i - y._i;
+    });
+    return rows;
+  }
   _rowOptions() {
     const src = Array.isArray(this._config.row_options) && this._config.row_options.length ? this._config.row_options : [6, 8, 10, 12, 16, 20, 30, 50];
     const out = [];
@@ -1039,18 +1096,14 @@ tr[data-rk] { cursor:pointer; }
     if (!all) return null;
     // The nearest flights first (time window and row limit), then optionally listed A-Z by city like a real board
     const rows = all.slice(0, this._rowCap(win)).map(f => this._rowOf(f, kind));
-    if (String(this._config.sort || "time").toLowerCase() === "city") {
-      rows.forEach((r, i) => { r._i = i; });
-      rows.sort((x, y) => String(x.c).localeCompare(String(y.c)) || x._i - y._i);
-    }
-    return rows;
+    return this._sortRows(rows);
   }
   _rowOf(f, kind) {
     const key = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
     const [s, cls] = this._status(f, kind);
     return { id: (f.flight_number || f.callsign || "") + "-" + f[key], t: this._fmt(f[key]),
       c: String(f.airport_city || f.airport_name || f.airport_code_iata || ""), code: String(f.airport_code_iata || ""),
-      fl: String(f.flight_number || f.callsign || ""), al: String(f.airline_short || f.airline || ""), s, cls, keys: this._flightKeys(f), idk: this._flightKeys(f, true), kind, raw: f };
+      ts: f[key], fl: String(f.flight_number || f.callsign || ""), al: String(f.airline_short || f.airline || ""), s, cls, keys: this._flightKeys(f), idk: this._flightKeys(f, true), kind, raw: f };
   }
   // ---- flight tracker ----
   _trkNorm(v) { return String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
@@ -1662,7 +1715,10 @@ tr[data-rk] { cursor:pointer; }
   }
   _tableRaleigh(rows, kind, pfx) {
     const hasG = pfx === "trk" ? this._gateTiles > 0 : this._config.gates_entity && this._hass && !!this._hass.states[this._config.gates_entity];
-    const head = `<tr><th class="rc">City / Time</th><th class="rf">Airline / Flight</th>${hasG ? '<th class="rg">Gate</th>' : ""}<th class="rs">Status</th></tr>`;
+    // Column titles are buttons that sort the board (not in the tracking panel)
+    const sh = (k, label) => pfx === "trk" ? label :
+      `<span class="sorth${this._sortKey === k ? " on" : ""}" data-sk="${k}" title="Sort by ${label.toLowerCase()}">${label}${this._sortKey === k ? (this._sortDir === -1 ? " &#9660;" : " &#9650;") : ""}</span>`;
+    const head = `<tr><th class="rc">${sh("city", "City")} / ${sh("time", "Time")}</th><th class="rf">${sh("airline", "Airline")} / ${sh("flight", "Flight")}</th>${hasG ? `<th class="rg">${sh("gate", "Gate")}</th>` : ""}<th class="rs">${sh("status", "Status")}</th></tr>`;
     const body = rows.map((r, i) => {
       const rk = this._rk(r, (pfx || "") + kind + i);
       const gate = !hasG ? "" : pfx === "trk" ? (this._gateOf(r).g || "") : this._boardGate(r);

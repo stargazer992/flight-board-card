@@ -1,6 +1,8 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Raleigh style: click a column title to sort the board on it (City, Time, Airline, Flight, Gate or Status); click again to reverse. Remembered per device. Option `sort` sets the starting order.
+- Companion script: OpenSky is now asked for all airborne flights in one request every 5 minutes (was one request per flight every 2 minutes), and pauses when OpenSky answers HTTP 429 (too many requests) instead of retrying every minute.
 - Raleigh style closer to the real boards: option `sort: city` lists flights A-Z by city (airport code when codes are shown), `header_image` puts your own picture behind the DEPARTURES and ARRIVALS banner, and times read `01:45PM` (`compact_time`).
 - Raleigh style on small screens: when city names do not fit (a phone), the board shows airport codes (ATL, MCO) instead of truncated names. Option `city_codes`: `auto`, `always` or `never`.
 - New Rows dropdown next to the time window. The two work together: choosing a window shows every flight in it (up to `max_rows`), and choosing more rows than the window holds widens the window to the next one that has enough. `Auto` fits the rows to the window. Options: `show_rows_selector`, `row_options`, `max_rows`.

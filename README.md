@@ -123,7 +123,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `show_window_selector` | `true` | Show the time window dropdown (Any time / Next 1h ... 24h) on the card |
 | `time_windows` | 1, 2, 4, 8, 12, 24 | Hours offered in the time window dropdown |
 | `city_codes` | `auto` | Raleigh style: `auto` shows the airport code (ATL, MCO) instead of the city name when the names do not fit, for example on a phone; `always` or `never` forces it |
-| `sort` | `time` | `time` lists flights by time. `city` shows the nearest flights (per the time window and rows) A-Z by city, like a real airport board |
+| `sort` | `time` | Starting order: `time`, `city`, `airline`, `flight`, `gate` or `status`. In the Raleigh style you can click any column title (City, Time, Airline, Flight, Gate, Status) to sort on it; click it again to reverse. The choice is remembered on that device. The nearest flights (per the time window and rows) are picked first, then sorted |
 | `header_image` | (none) | Raleigh style: your own picture behind the DEPARTURES and ARRIVALS banner, for example `/local/logos/flightboard/header.jpg` (a wide image, about 1200 x 250 px, with the right side clear for the title) |
 | `compact_time` | `true` | Raleigh style: times as `01:45PM` like the airport boards (12-hour clock) |
 | `show_rows_selector` | `true` | Show the Rows dropdown on the card. Picking a time window grows the rows to fit every flight in it; picking more rows than the window holds widens the window |
@@ -195,7 +195,7 @@ tracked_flights:
 - Gates are often empty until a few hours before departure, and some airports never publish them. Empty values are simply not shown.
 - The script also publishes `sensor.flight_board_gates` (gate for every departure, belt for every arrival at your airport). The London style shows it as a Gate / Belt column.
 - The Flightradar24 flight list has no gates, so the script reads them from two other Flightradar24 sources: the airport board of the airport the card shows (flights that have not departed yet, refreshed every 10 minutes) and the detail view of a single flight (flights in the air). If that is empty too, an optional second source is [AeroDataBox](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) (free RapidAPI plan): paste your key into `AERODATABOX_API_KEY` at the top of the script. It is only asked for flights within 8 hours of departure or landing and at most every 30 minutes per flight.
-- OpenSky works without an account (about 400 requests a day). For more, create a free API client on opensky-network.org and put the client id and secret at the top of the script. Set `OPENSKY_ENABLED = False` to switch it off.
+- OpenSky works without an account (about 400 credits a day). The script asks for all airborne flights in one request every 5 minutes, and when OpenSky answers "too many requests" (HTTP 429) it pauses OpenSky for the wait OpenSky sends (30 minutes if none) and keeps the last known positions. For more, create a free API client on opensky-network.org and put the client id and secret at the top of the script. Set `OPENSKY_ENABLED = False` to switch it off.
 - OpenSky only knows aircraft its receivers hear, and it is only asked about flights that are in the air.
 - "Time to gate" is shown as the time to landing (or to departure), because no source publishes a true time at the gate.
 

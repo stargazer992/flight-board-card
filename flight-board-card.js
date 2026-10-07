@@ -367,6 +367,9 @@ th .sorth.on { color:var(--fg); }
 .msg { padding:22px; font-size:calc(var(--fs) * .8); line-height:1.5; color:#ddd; }
 .msg b { color:#ffd21f; }
 .msg a { color:#7fd1ff; }
+.board.mini { padding:0 !important; background:transparent !important; box-shadow:none !important; border:0 !important; }
+.board.mini .top, .board.mini .trkbar, .board.mini .foot { display:none !important; }
+.board.mini .trkcols { margin-bottom:0; }
 .foot { color:var(--sub); font-size:calc(var(--fs) * .55); margin:10px 4px 0; text-align:right; }
 
 .board.classic { --bg:#0a0a0a; --fg:#ffd21f; --font:"Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
@@ -464,7 +467,7 @@ th .sorth.on { color:var(--fg); }
     const dep = `<div class="panel"><div class="ph">${this._icon("dep")}Departures</div><div class="dep"></div></div>`;
     const arr = `<div class="panel"><div class="ph">${this._icon("arr")}Arrivals</div><div class="arr"></div></div>`;
     this.shadowRoot.innerHTML = `<style>${this._css()}</style>
-<div class="board">
+<div class="board${tro && c.tracked_controls !== true ? " mini" : ""}">
   <div class="top"><div class="name"></div>
     <div class="right">${c.show_airport_selector && !tro ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${tro ? "" : this._alHtml() + this._wnHtml() + this._rnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}<div class="clock"></div></div></div>
   ${this._trkHtml()}
@@ -1039,7 +1042,7 @@ th .sorth.on { color:var(--fg); }
   }
   _applyTheme() {
     const b = this.shadowRoot.querySelector(".board");
-    if (b) b.className = "board " + this._theme + (this._h12() ? " h12" : "") + (this._config.show_airline === false ? " noair" : "");
+    if (b) b.className = "board " + this._theme + (this._h12() ? " h12" : "") + (this._config.show_airline === false ? " noair" : "") + (this._config.show === "tracked" && this._config.tracked_controls !== true ? " mini" : "");
     const tbb = this.shadowRoot.querySelector(".thbtn");
     if (tbb) tbb.innerHTML = (FBC_THEMES[this._theme] || this._theme) + " &#9662;";
     this._fit(); setTimeout(() => this._fit(), 300);
@@ -1910,7 +1913,7 @@ th .sorth.on { color:var(--fg); }
 
 const FBC_LABELS = {
   theme: "Start style", time_format: "Time format", time_zone_mode: "Pop-up time zone", font_size: "Text size (px)", rows: "Rows per list",
-  show: "Show", layout: "Layout", past_minutes: "Hide departed/landed flights after (minutes)",
+  show: "Show", tracked_controls: "Tracked-only card: also show the title, clock and Track flight box", layout: "Layout", past_minutes: "Hide departed/landed flights after (minutes)",
   show_airline: "Show airline and airport code", show_selector: "Show style menu on the card",
   show_airport_selector: "Show airport search on the card",
   show_airline_selector: "Show airline dropdown on the card", allow_add_airlines: "Let people add airlines from the card",

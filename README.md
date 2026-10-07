@@ -28,7 +28,6 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
   - **Amsterdam style**: dark blue and yellow, clean and very readable
   - **London style**: Heathrow-inspired black and yellow, with a Gate and Belt column
   - **Raleigh style**: blue banner and white rows with City / Time, Airline / Flight, Gate and Status, like the boards at Raleigh-Durham
-  - **LED dot-matrix**: glowing amber retro display
 - Airport search on the card: type a name, city, IATA or ICAO code and pick from about 8,000 airports worldwide, with no setup or API key needed
 - A short list of favourite airports is shown when you tap the search field. Use the built-in list or set your own.
 - Times and clock in the airport's own local time zone, 24-hour or 12-hour format
@@ -43,8 +42,8 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
 | ![Classic](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/classic.png) | ![Digital flaps](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/digital.png) |
 | **Amsterdam style** | **London style** |
 | ![Amsterdam style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/amsterdam.png) | ![London style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/london.png) |
-| **LED dot-matrix** | **Raleigh style** |
-| ![LED dot-matrix](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/led.png) | ![Raleigh style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/raleigh.png) |
+| **Raleigh style** | |
+| ![Raleigh style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/raleigh.png) | |
 
 ## Requirements
 
@@ -106,7 +105,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 
 | Option | Default | Description |
 |---|---|---|
-| `theme` | `classic` | Starting style: `classic`, `splitflap`, `digital`, `amsterdam`, `london`, `raleigh`, `led`. A style picked in the menu on the card overrides this on that device. |
+| `theme` | `classic` | Starting style: `classic`, `splitflap`, `digital`, `amsterdam`, `london`, `raleigh`. (The old `led` value still works and shows Digital flaps.) A style picked in the menu on the card overrides this on that device. |
 | `time_format` | `24h` | `24h` (18:30) or `12h` (6:30 PM) |
 | `rows` | `12` | Number of flights shown in each list. Picking a time window on the card shows every flight in it (see `max_rows`) |
 | `font_size` | `22` | Base text size in pixels |

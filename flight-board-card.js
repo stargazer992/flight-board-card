@@ -18,9 +18,8 @@ const FBC_THEMES = {
   amsterdam: "Amsterdam style",
   london:    "London style",
   raleigh:   "Raleigh style",
-  led:       "LED dot-matrix",
 };
-const FBC_THEME_ALIASES = { solari: "splitflap", frankfurt: "digital", schiphol: "amsterdam", heathrow: "london" };
+const FBC_THEME_ALIASES = { solari: "splitflap", frankfurt: "digital", schiphol: "amsterdam", heathrow: "london", led: "digital" };
 const FBC_AIRPORTS = [
   {icao:"ESSA",iata:"ARN",name:"Stockholm Arlanda",tz:"Europe/Stockholm"},
   {icao:"ESSB",iata:"BMA",name:"Stockholm Bromma",tz:"Europe/Stockholm"},
@@ -432,14 +431,6 @@ th .sorth.on { color:var(--fg); }
 .board.raleigh .pcard { color:#101b33; --sub:#5d6a80; --th:#56627a; --line:#cfd6e2; }
 .board.raleigh .pcard .ptitle, .board.raleigh .pcard .proute .pa b, .board.raleigh .pcard .pgrid b { color:#101b33; }
 .board.raleigh .pclose { color:#56627a; }
-
-.board.led { --bg:#050505; --fg:#ffb000; --font:"Courier New","DejaVu Sans Mono",monospace;
-  --title:#ffb000; --accent:#ff7a00; --clock:#ff3b1f; --panel:#000; --hbg:#000; --hfg:#ffb000; --th:#8a5a00; --line:#2a1a00; --line2:transparent;
-  --zebra:transparent; --time:#ffb000; --city:#ffb000; --cityCase:uppercase; --flight:#ffb000; --st:#ffb000; --ok:#7dff6a; --warn:#ff7a00; --bad:#ff2d2d; --brd:#7fd1ff;
-  --sub:#8a5a00; --selbg:#140c00; --selfg:#ffb000; }
-.board.led td, .board.led .ph, .board.led .clock, .board.led .name { text-shadow:0 0 6px currentColor, 0 0 1px currentColor; letter-spacing:2px; }
-.board.led .panel { background-color:#000; background-image:radial-gradient(rgba(255,176,0,.08) 1px, transparent 1.4px); background-size:5px 5px; }
-.board.led .ph { border-bottom:1px solid #3a2600; }
 `;
   }
   _build() {

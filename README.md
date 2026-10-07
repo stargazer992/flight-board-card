@@ -18,6 +18,8 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
   - **Airline filter**: dropdown on the card (AA, DL, UA by default); add or remove airlines right on the card, and hide private and charter flights
   - **Time window**: dropdown to show only the next 1, 2, 4, 8, 12 or 24 hours
   - **Flight tracker**: pick a flight from the board, or type a flight number or tail number, to pin its status in a Tracking panel. Flights that are not on the board yet are followed through the Flightradar24 integration (live ETA, altitude and speed once airborne), with an optional schedule script for flights that have not departed
+  - **Flight pop-up**: click any flight on the board for its details: aircraft, scheduled, estimated and actual times, gate, terminal and baggage belt, live position, altitude, speed, distance to the destination and a countdown to landing (gate and position need the companion script)
+  - **Gate column** in the tracking panels
   - **Split-flap flipping**: letters and numbers scroll through the drum before settling on the right character, like a real board
 - Six board styles, selectable from a menu on the card itself:
   - **Classic**: black and yellow
@@ -123,6 +125,9 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `show_flight_tracker` | `true` | Show the Track flight dropdown and the "Track a flight" field on the card |
 | `track_via_integration` | `true` | Follow flights that are not on the board through the Flightradar24 integration's "Add to track" feature (see Flight tracker) |
 | `schedule_entity` | `sensor.flight_board_schedule` | Optional sensor with the schedule of flights that are not airborne yet (see below) |
+| `show_gate` | `true` | Show a Gate column (gate, terminal, baggage belt) in the tracking panels. Needs the companion script |
+| `flight_popup` | `true` | Click any flight on the board to open a details pop-up (times, gate, baggage belt, position, altitude, time to landing) |
+| `lookup_service` | `pyscript.flight_board_lookup` | Service of the companion script that the card calls to look up a flight |
 | `tracked_flights` | (none) | Flight numbers always tracked, for example `[AA1234, DL567]`. Flights added on the card are saved on that device and can be removed with the x |
 | `hide_private` | `true` | Hide private, charter and general-aviation flights (flights without an airline IATA code) |
 | `flip_cycle` | `true` | Split-flap style only: letters and numbers scroll through the drum before settling, like a real board |
@@ -168,6 +173,13 @@ tracked_flights:
 **Flights that are not on the board.** The airport lists only reach a few hours ahead, so a flight that is further out is not on the board yet. For those, the card asks the Flightradar24 integration to follow the flight (it writes the number to `text.flightradar24_add_to_track`) and shows it from `sensor.flightradar24_additional_tracked`. Until the aircraft is airborne the integration only knows the flight number, so the panel shows "Not airborne yet". Once it is in the air you see origin or destination, ETA, altitude and ground speed, and after landing "Landed". Tail numbers (`N123AB`) work too. Flights added on the card are removed from the integration again when you remove them (set `track_via_integration: false` to turn this off). The integration's tracked list is shared by the whole Home Assistant installation. Times are shown in the airport's local time zone.
 
 **Schedule for flights that have not departed (optional).** Before takeoff the integration knows nothing but the flight number. The optional PyScript [`extras/automation_flight_board_schedule.py`](extras/automation_flight_board_schedule.py) looks up the schedule on Flightradar24 for the flights the card is tracking and publishes it as `sensor.flight_board_schedule`. The card then shows the destination or origin and the scheduled time (with the date, for example `SCHED OCT 9`, when the flight leaves on another day), and switches to live data once the plane is airborne. It needs [PyScript](https://github.com/custom-components/pyscript) and uses an unofficial Flightradar24 web endpoint that can be blocked or change at any time; the script then keeps the last good data and sends one notification. Copy the file to your `pyscript` folder.
+
+**Gate, baggage belt and live position (optional, same script).** The same script also reads the departure and arrival gate, terminal and baggage belt from Flightradar24, and the live position (latitude, longitude, altitude, speed, heading, vertical rate) from [OpenSky Network](https://opensky-network.org/) as a second source. Both are published in `sensor.flight_board_schedule`. The card shows them in a Gate column in the tracking panels and in the flight pop-up (click any flight on the board). When you open a pop-up the card asks the script to look that flight up (`pyscript.flight_board_lookup`), and the data appears within a few seconds.
+
+- Gates are often empty until a few hours before departure, and some airports never publish them. Empty values are simply not shown.
+- OpenSky works without an account (about 400 requests a day). For more, create a free API client on opensky-network.org and put the client id and secret at the top of the script. Set `OPENSKY_ENABLED = False` to switch it off.
+- OpenSky only knows aircraft its receivers hear, and it is only asked about flights that are in the air.
+- "Time to gate" is shown as the time to landing (or to departure), because no source publishes a true time at the gate.
 
 The flight is found on the board when it is in the data for the airport the board is showing. The Flightradar24 integration lists a limited number of flights to and from that airport, a few hours either side of now. A flight that is not there shows "is not on the board right now". If a flight number is used for both an arrival and a departure at the airport, both are shown.
 

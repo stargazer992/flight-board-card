@@ -122,6 +122,9 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `allow_add_airlines` | `true` | Lets you add airlines to the dropdown on the card: pick one from "On the board now" or type a 2-letter code. Added airlines are saved on that device and can be removed with the x |
 | `show_window_selector` | `true` | Show the time window dropdown (Any time / Next 1h ... 24h) on the card |
 | `time_windows` | 1, 2, 4, 8, 12, 24 | Hours offered in the time window dropdown |
+| `show_rows_selector` | `true` | Show the Rows dropdown on the card. Picking a time window grows the rows to fit every flight in it; picking more rows than the window holds widens the window |
+| `row_options` | 6, 8, 10, 12, 16, 20, 30, 50 | Row counts offered in the Rows dropdown |
+| `max_rows` | 60 | Most rows shown when the rows follow the time window |
 | `time_window` | `0` | Time window selected at start in hours (`0` = any time). A choice made in the dropdown overrides it on that device |
 | `show_flight_tracker` | `true` | Show the Track flight dropdown and the "Track a flight" field on the card |
 | `track_via_integration` | `true` | Follow flights that are not on the board through the Flightradar24 integration's "Add to track" feature (see Flight tracker) |

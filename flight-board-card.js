@@ -56,7 +56,7 @@ const FBC_DEFAULTS = {
   theme: "classic", time_format: "24h", show: "both", layout: "auto", show_airline: true,
   show_selector: true, show_airport_selector: true,
   show_airline_selector: true, hide_private: true, airline: "",
-  allow_add_airlines: true, show_window_selector: true, time_window: 0,
+  allow_add_airlines: true, show_window_selector: true, time_window: 0, show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50], max_rows: 60,
   show_flight_tracker: true,
   // Flights that are not on the airport board are followed through the Flightradar24 "additional tracked" feature
   track_via_integration: true,
@@ -142,6 +142,14 @@ class FlightBoardCard extends HTMLElement {
     const cfgWn = Number(this._config.time_window) || 0;
     if (savedWn !== null && (savedWn === "0" || wl.indexOf(Number(savedWn)) >= 0)) this._window = Number(savedWn);
     else this._window = wl.indexOf(cfgWn) >= 0 ? cfgWn : 0;
+    // Rows: saved choice on this device wins (then rows no longer follow the window), else the config value.
+    // Until the user picks a row count, the board grows with the time window so no flights are cut off.
+    this._rowsKey = "flight-board-card-rows";
+    let savedRn = null;
+    try { savedRn = localStorage.getItem(this._rowsKey); } catch (e) {}
+    const cfgRn = Math.max(1, Number(this._config.rows) || 12);
+    if (savedRn !== null && Number(savedRn) > 0) { this._rowsN = Number(savedRn); this._rowsAuto = false; }
+    else { this._rowsN = cfgRn; this._rowsAuto = true; }
     this._apc = null;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._built = false;
@@ -187,20 +195,20 @@ class FlightBoardCard extends HTMLElement {
 .name { font-size:calc(var(--fs) + 8px); font-weight:700; letter-spacing:1px; color:var(--title); text-transform:uppercase; }
 .name small { color:var(--accent); margin-left:10px; font-size:var(--fs); }
 .right { display:flex; align-items:center; gap:14px; }
-.apbox, .thbox, .albox, .wnbox, .trbox { position:relative; }
-.apin, .thbtn, .albtn, .wnbtn, .trbtn { font-size:calc(var(--fs) * .62); padding:6px 10px; border-radius:6px; background:var(--selbg); color:var(--selfg);
+.apbox, .thbox, .albox, .wnbox, .rnbox, .trbox { position:relative; }
+.apin, .thbtn, .albtn, .wnbtn, .rnbtn, .trbtn { font-size:calc(var(--fs) * .62); padding:6px 10px; border-radius:6px; background:var(--selbg); color:var(--selfg);
   border:1px solid var(--line); font-family:inherit; text-shadow:none; }
 .apin { width:min(300px, 34vw); outline:none; }
 .apin::placeholder { color:var(--selfg); opacity:.7; }
-.thbtn, .albtn, .wnbtn, .trbtn { cursor:pointer; white-space:nowrap; }
-.apres, .thres, .alres, .wnres, .trres { display:none; position:absolute; right:0; top:calc(100% + 4px); max-height:60vh; overflow:auto;
+.thbtn, .albtn, .wnbtn, .rnbtn, .trbtn { cursor:pointer; white-space:nowrap; }
+.apres, .thres, .alres, .wnres, .rnres, .trres { display:none; position:absolute; right:0; top:calc(100% + 4px); max-height:60vh; overflow:auto;
   background:#1c1c1c; border:1px solid #444; border-radius:8px; z-index:10; box-shadow:0 8px 24px rgba(0,0,0,.6);
   font-family:"Roboto","Helvetica Neue",Arial,sans-serif; text-shadow:none; letter-spacing:0; text-transform:none; }
 .apres { width:min(440px, 80vw); }
-.thres, .alres, .wnres { width:min(340px, 80vw); }
+.thres, .alres, .wnres, .rnres { width:min(340px, 80vw); }
 .trres { width:min(460px, 86vw); }
-.apitem, .thitem, .alitem, .wnitem, .aladd { padding:12px 14px; color:#eee; font-size:calc(var(--fs) * .7); cursor:pointer; border-bottom:1px solid #2c2c2c; }
-.apitem:hover, .thitem:hover, .alitem:hover, .wnitem:hover, .aladd:hover { background:#2b2b2b; }
+.apitem, .thitem, .alitem, .wnitem, .rnitem, .aladd { padding:12px 14px; color:#eee; font-size:calc(var(--fs) * .7); cursor:pointer; border-bottom:1px solid #2c2c2c; }
+.apitem:hover, .thitem:hover, .alitem:hover, .wnitem:hover, .rnitem:hover, .aladd:hover { background:#2b2b2b; }
 .alitem { display:flex; justify-content:space-between; align-items:center; }
 .alitem b, .aladd b { color:#ffd21f; margin-right:8px; }
 .alrm { color:#999; padding:0 4px 0 16px; font-size:1.4em; line-height:1; }
@@ -395,7 +403,7 @@ tr[data-rk] { cursor:pointer; }
     this.shadowRoot.innerHTML = `<style>${this._css()}</style>
 <div class="board">
   <div class="top"><div class="name"></div>
-    <div class="right">${c.show_airport_selector ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${this._alHtml()}${this._wnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}<div class="clock"></div></div></div>
+    <div class="right">${c.show_airport_selector ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${this._alHtml()}${this._wnHtml()}${this._rnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}<div class="clock"></div></div></div>
   ${this._trkHtml()}
   <div class="${colsCls}">${show !== "arrivals" ? dep : ""}${show !== "departures" ? arr : ""}</div>
   <div class="msg" style="display:none"></div>
@@ -535,9 +543,61 @@ tr[data-rk] { cursor:pointer; }
         if (!it) return;
         this._window = Number(it.dataset.h) || 0;
         try { localStorage.setItem(this._wnKey, String(this._window)); } catch (err) {}
-        wclose(); this._updateWnBtn(); this._render();
+        // A new window makes the rows follow it again, so every flight in the window is shown
+        this._rowsAuto = true;
+        try { localStorage.removeItem(this._rowsKey); } catch (err) {}
+        wclose(); this._updateWnBtn(); this._updateRnBtn(); this._render();
       });
       this._updateWnBtn();
+    }
+    const rb = this.shadowRoot.querySelector(".rnbtn");
+    if (rb) {
+      const rm = this.shadowRoot.querySelector(".rnres");
+      ["click", "pointerdown", "touchstart"].forEach(ev => { rb.addEventListener(ev, stop); rm.addEventListener(ev, stop); });
+      const rclose = () => { rm.style.display = "none"; };
+      const prevWn = this._closeWn;
+      this._closeWn = () => { if (prevWn) prevWn(); rclose(); };
+      rb.addEventListener("click", () => {
+        if (rm.style.display === "block") { rclose(); return; }
+        if (this._closeMenus) this._closeMenus();
+        if (this._closeAl) this._closeAl();
+        if (this._closeTr) this._closeTr();
+        if (prevWn) prevWn();
+        const list = [0].concat(this._rowOptions());
+        rm.innerHTML = list.map(n => {
+          const on = n === 0 ? this._rowsAuto : (!this._rowsAuto && n === this._rowsN);
+          const lab = n === 0 ? "Auto (fit the time window)" : n + " rows";
+          return `<div class="rnitem${on ? " on" : ""}" data-n="${n}">${on ? "&#10003; " : ""}${lab}</div>`;
+        }).join("");
+        rm.style.display = "block";
+      });
+      rm.addEventListener("click", (e) => {
+        const it = e.target.closest(".rnitem");
+        if (!it) return;
+        const n = Number(it.dataset.n) || 0;
+        if (n === 0) {
+          this._rowsAuto = true;
+          try { localStorage.removeItem(this._rowsKey); } catch (err) {}
+        } else {
+          this._rowsAuto = false; this._rowsN = n;
+          try { localStorage.setItem(this._rowsKey, String(n)); } catch (err) {}
+          // Not enough flights in the window for that many rows: widen the window to the next one that has enough
+          if (this._window) {
+            const wl = this._windows();
+            let pick = 0;
+            for (let i = 0; i < wl.length; i++) {
+              if (wl[i] >= this._window && this._countIn(wl[i]) >= n) { pick = wl[i]; break; }
+            }
+            if (pick !== this._window) {
+              this._window = pick;
+              try { localStorage.setItem(this._wnKey, String(pick)); } catch (err) {}
+              this._updateWnBtn();
+            }
+          }
+        }
+        rclose(); this._updateRnBtn(); this._render();
+      });
+      this._updateRnBtn();
     }
     const ap = this.shadowRoot.querySelector("input.apin");
     if (ap) {
@@ -896,20 +956,53 @@ tr[data-rk] { cursor:pointer; }
     if (est) return ["ON TIME", ""];
     return ["SCHEDULED", ""];
   }
-  _rows(entityId, kind) {
+  // Flights that pass the airline, private and time window filters, sorted by time (no row limit)
+  _filt(entityId, kind, win) {
     const st = this._hass.states[entityId];
     if (!st || !Array.isArray(st.attributes.flights)) return null;
     const keep = Date.now() / 1000 - (Number(this._config.past_minutes) || 0) * 60;
     const key = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
     const rkey = kind === "dep" ? "time_real_departure" : "time_real_arrival";
     const al = this._airline, hp = this._config.hide_private !== false;
-    const win = Number(this._window) || 0, lim = Date.now() / 1000 + win * 3600;
+    const lim = Date.now() / 1000 + win * 3600;
     return st.attributes.flights.filter(f => f && f[key]).filter(f => (f[rkey] || f[key]) >= keep)
       .filter(f => !hp || f.airline_iata)
       .filter(f => !win || f[key] <= lim)
       .filter(f => !al || String(f.airline_iata || "").toUpperCase() === al)
-      .sort((x, y) => x[key] - y[key]).slice(0, Number(this._config.rows) || 12)
-      .map(f => this._rowOf(f, kind));
+      .sort((x, y) => x[key] - y[key]);
+  }
+  // Most flights either side has inside a window (hours, 0 = any time)
+  _countIn(win) {
+    let m = 0;
+    try {
+      const d = this._filt(this._config.departures_entity, "dep", Number(win) || 0);
+      const a = this._filt(this._config.arrivals_entity, "arr", Number(win) || 0);
+      m = Math.max(d ? d.length : 0, a ? a.length : 0);
+    } catch (e) {}
+    return m;
+  }
+  _rowOptions() {
+    const src = Array.isArray(this._config.row_options) && this._config.row_options.length ? this._config.row_options : [6, 8, 10, 12, 16, 20, 30, 50];
+    const out = [];
+    for (const v of src) { const n = Math.floor(Number(v)); if (isFinite(n) && n > 0 && out.indexOf(n) < 0) out.push(n); }
+    return out.sort((a, b) => a - b);
+  }
+  // Rows to show: the chosen number, or in auto mode enough for every flight in the window (capped by max_rows)
+  _rowCap(win) {
+    const w = Number(win) || 0, mx = Math.max(1, Number(this._config.max_rows) || 60);
+    if (this._rowsAuto && w) return Math.min(mx, Math.max(this._rowsN, this._countIn(w)));
+    return this._rowsN;
+  }
+  _updateRnBtn() {
+    const b = this.shadowRoot && this.shadowRoot.querySelector(".rnbtn");
+    if (!b) return;
+    b.innerHTML = (this._rowsAuto ? "Rows: auto" : this._rowsN + " rows") + " &#9662;";
+  }
+  _rows(entityId, kind) {
+    const win = Number(this._window) || 0;
+    const all = this._filt(entityId, kind, win);
+    if (!all) return null;
+    return all.slice(0, this._rowCap(win)).map(f => this._rowOf(f, kind));
   }
   _rowOf(f, kind) {
     const key = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
@@ -1307,6 +1400,10 @@ tr[data-rk] { cursor:pointer; }
     return this._config.show_window_selector !== false
       ? `<div class="wnbox"><button class="wnbtn" type="button" title="Time window"></button><div class="wnres"></div></div>` : "";
   }
+  _rnHtml() {
+    return this._config.show_rows_selector !== false
+      ? `<div class="rnbox"><button class="rnbtn" type="button" title="Rows shown"></button><div class="rnres"></div></div>` : "";
+  }
   _updateWnBtn() {
     const b = this.shadowRoot && this.shadowRoot.querySelector(".wnbtn");
     if (!b) return;
@@ -1606,7 +1703,7 @@ const FBC_LABELS = {
   show_airport_selector: "Show airport search on the card",
   show_airline_selector: "Show airline dropdown on the card", allow_add_airlines: "Let people add airlines from the card",
   show_window_selector: "Show time window dropdown on the card", show_flight_tracker: "Show the flight tracker (dropdown and field) on the card", show_gate: "Show gate and terminal for tracked flights (needs the companion script)", flight_popup: "Click a flight to see its details pop-up",
-  track_via_integration: "Follow flights that are not on the board through Flightradar24", time_window: "Start time window (hours ahead, 0 = any time)", hide_private: "Hide private and charter flights",
+  track_via_integration: "Follow flights that are not on the board through Flightradar24", time_window: "Start time window (hours ahead, 0 = any time)", show_rows_selector: "Show the rows dropdown on the card (rows and time window adjust to each other)", max_rows: "Most rows shown in auto mode", hide_private: "Hide private and charter flights",
   flip_cycle: "Split-flap: letters cycle before settling", flip_on_load: "Split-flap: spin in when the board loads",
   flip_step_ms: "Split-flap: milliseconds per flip", flip_max_steps: "Split-flap: most flips per character", title: "Title (leave empty for the airport name)",
   departures_entity: "Departures sensor", arrivals_entity: "Arrivals sensor", airport_entity: "Tracked airport entity",
@@ -1634,6 +1731,8 @@ const FBC_SCHEMA = [
   { name: "flight_popup", selector: { boolean: {} } },
   { name: "track_via_integration", selector: { boolean: {} } },
   { name: "time_window", selector: { number: { min: 0, max: 48, step: 1, mode: "box" } } },
+  { name: "show_rows_selector", selector: { boolean: {} } },
+  { name: "max_rows", selector: { number: { min: 4, max: 200, step: 1, mode: "box" } } },
   { name: "hide_private", selector: { boolean: {} } },
   { name: "flip_cycle", selector: { boolean: {} } },
   { name: "flip_on_load", selector: { boolean: {} } },

@@ -56,7 +56,7 @@ const FBC_DEFAULTS = {
   theme: "classic", time_format: "24h", show: "both", layout: "auto", show_airline: true,
   show_selector: true, show_airport_selector: true,
   show_airline_selector: true, hide_private: true, airline: "",
-  allow_add_airlines: true, show_window_selector: true, time_window: 0, show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50], max_rows: 60,
+  allow_add_airlines: true, show_window_selector: true, time_window: 0, city_codes: "auto", show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50], max_rows: 60,
   show_flight_tracker: true,
   // Flights that are not on the airport board are followed through the Flightradar24 "additional tracked" feature
   track_via_integration: true,
@@ -373,6 +373,9 @@ tr[data-rk] { cursor:pointer; }
 .board.raleigh th { background:#e6ebf3; color:#56627a; text-transform:uppercase; letter-spacing:.8px; font-weight:700; font-size:calc(var(--fs) * .5); padding:4px 8px; border-bottom:1px solid #cfd6e2; }
 .board.raleigh td { padding:6px 8px; font-size:calc(var(--fs) * .8); border-bottom:1px solid var(--line2); color:var(--st); }
 .board.raleigh td.rc { width:35%; }
+.board.raleigh td.rc b.cod { display:none; }
+.board.raleigh table.codes td.rc b.cty { display:none; }
+.board.raleigh table.codes td.rc b.cod { display:block; }
 .board.raleigh td.rc b { display:block; font-size:calc(var(--fs) * .78); font-weight:800; letter-spacing:.3px; color:var(--city); text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; }
 .board.raleigh td.rc span, .board.raleigh td.rf span.rfn { display:block; font-size:calc(var(--fs) * .52); color:var(--time); font-weight:500; }
 .board.raleigh td.rf, .board.raleigh th.rf { width:27%; font-weight:700; text-align:center; }
@@ -894,7 +897,24 @@ tr[data-rk] { cursor:pointer; }
     const f = Math.max(9, Math.min(fs, ((p.clientWidth - 56) / (tot + (this._gateTiles || 0)) - 2) / 0.78));
     b.style.setProperty("--tfs", f.toFixed(1) + "px");
     this._shorten();
+    this._cityFit();
     for (const k of ["t", "c", "f", "s"]) b.style.setProperty("--w" + k, (100 * n[k] / tot).toFixed(2) + "%");
+  }
+  // Raleigh style: when a city name does not fit its column (a phone, a narrow panel), that table shows
+  // the airport code instead (ATL, MCO). Option city_codes: auto (default), always or never.
+  _cityFit() {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const mode = String(this._config.city_codes || "auto").toLowerCase();
+    root.querySelectorAll(".board.raleigh table").forEach(t => {
+      let on = mode === "always";
+      if (mode === "auto") {
+        t.classList.remove("codes");
+        const cs = t.querySelectorAll("td.rc b.cty");
+        for (let i = 0; i < cs.length; i++) { if (cs[i].clientWidth && cs[i].scrollWidth > cs[i].clientWidth + 1) { on = true; break; } }
+      }
+      t.classList.toggle("codes", on && mode !== "never");
+    });
   }
   _applyTheme() {
     const b = this.shadowRoot.querySelector(".board");
@@ -1624,7 +1644,7 @@ tr[data-rk] { cursor:pointer; }
       const prev = this._prev[pk], changed = prev !== undefined && prev !== r.s;
       this._prev[pk] = r.s;
       const sInner = changed ? `<div class="flip">${this._esc(st.t)}</div>` : this._esc(st.t);
-      return `<tr${this._trkClass(r)}${rk}><td class="rc"><b>${this._esc(r.c)}</b><span>${this._esc(r.t)}</span></td><td class="rf">${this._rdAirline(r)}</td>` +
+      return `<tr${this._trkClass(r)}${rk}><td class="rc"><b class="cty">${this._esc(r.c)}</b><b class="cod">${this._esc(r.code || r.c)}</b><span>${this._esc(r.t)}</span></td><td class="rf">${this._rdAirline(r)}</td>` +
         `${hasG ? `<td class="rg">${this._esc(gate)}</td>` : ""}<td class="rs ${st.cls}">${sInner}</td></tr>`;
     }).join("");
     return `<table>${head}${body}</table>`;
@@ -1703,7 +1723,8 @@ const FBC_LABELS = {
   show_airport_selector: "Show airport search on the card",
   show_airline_selector: "Show airline dropdown on the card", allow_add_airlines: "Let people add airlines from the card",
   show_window_selector: "Show time window dropdown on the card", show_flight_tracker: "Show the flight tracker (dropdown and field) on the card", show_gate: "Show gate and terminal for tracked flights (needs the companion script)", flight_popup: "Click a flight to see its details pop-up",
-  track_via_integration: "Follow flights that are not on the board through Flightradar24", time_window: "Start time window (hours ahead, 0 = any time)", show_rows_selector: "Show the rows dropdown on the card (rows and time window adjust to each other)", max_rows: "Most rows shown in auto mode", hide_private: "Hide private and charter flights",
+  track_via_integration: "Follow flights that are not on the board through Flightradar24", time_window: "Start time window (hours ahead, 0 = any time)", city_codes: "Raleigh style: show airport codes (ATL) instead of city names when they do not fit",
+  show_rows_selector: "Show the rows dropdown on the card (rows and time window adjust to each other)", max_rows: "Most rows shown in auto mode", hide_private: "Hide private and charter flights",
   flip_cycle: "Split-flap: letters cycle before settling", flip_on_load: "Split-flap: spin in when the board loads",
   flip_step_ms: "Split-flap: milliseconds per flip", flip_max_steps: "Split-flap: most flips per character", title: "Title (leave empty for the airport name)",
   departures_entity: "Departures sensor", arrivals_entity: "Arrivals sensor", airport_entity: "Tracked airport entity",
@@ -1717,6 +1738,7 @@ const FBC_SCHEMA = [
   { name: "font_size", selector: { number: { min: 12, max: 40, step: 1, mode: "slider" } } },
   { name: "rows", selector: { number: { min: 3, max: 30, step: 1, mode: "slider" } } },
   { type: "grid", name: "", schema: [
+    { name: "city_codes", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Raleigh: airport code when the city does not fit (auto)" }, { value: "always", label: "Raleigh: always airport codes" }, { value: "never", label: "Raleigh: always city names" }] } } },
     { name: "layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Side by side (auto)" }, { value: "stacked", label: "Stacked" }] } } },
     { name: "past_minutes", selector: { number: { min: 0, max: 120, step: 5, mode: "box" } } },
   ] },

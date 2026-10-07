@@ -1003,8 +1003,29 @@ th .sorth.on { color:var(--fg); }
     }
     if (!this._timer) { this._tick(); this._timer = setInterval(() => this._tick(), 15000); }
   }
-  connectedCallback() { this._attach(); }
+  connectedCallback() {
+    this._attach();
+    // Another card (other dashboard, other tab, the pop-up of another board) changed the tracked flights: pick the new list up at once
+    if (!this._trkSync) {
+      this._trkSync = (e) => {
+        if (!this._config) return;
+        if (e && e.type === "storage" && e.key !== this._trKey) return;
+        if (e && e.detail && e.detail.src === this) return;
+        this._trkExtra = this._loadTrack();
+        if (this._built && this._hass) { this._render(); }
+      };
+      window.addEventListener("flight-board-card-tracked", this._trkSync);
+      window.addEventListener("storage", this._trkSync);
+    }
+    // Coming back to this tab or view: re-read in case the list changed meanwhile
+    if (this._trkSync) this._trkSync();
+  }
   disconnectedCallback() {
+    if (this._trkSync) {
+      window.removeEventListener("flight-board-card-tracked", this._trkSync);
+      window.removeEventListener("storage", this._trkSync);
+      this._trkSync = null;
+    }
     clearInterval(this._timer); this._timer = null;
     this._flapHalt();
     if (this._ro) { this._ro.disconnect(); this._ro = null; }
@@ -1262,6 +1283,8 @@ th .sorth.on { color:var(--fg); }
   }
   _saveTrack() {
     try { localStorage.setItem(this._trKey, JSON.stringify(this._trkExtra || [])); } catch (e) {}
+    // Tell the other flight-board cards on this page right away (the storage event only reaches other tabs)
+    try { window.dispatchEvent(new CustomEvent("flight-board-card-tracked", { detail: { src: this } })); } catch (e) {}
   }
   // Tracked flights from the YAML (fixed) plus the ones added on the card (removable)
   _trackedAll() {

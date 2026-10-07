@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Tracked flights are shared live between cards: track or untrack a flight on a board card (or in its pop-up) and any other flight-board card in the same browser, such as the main-dashboard tracked-only card, updates immediately, in other tabs too, without reloading the page.
 - The clock now sits next to the airport name on the title line, in the same size as the airport code next to the name (in the Split-flap style the flip-tile digits match the code letter for letter) instead of large at the far right.
 - Tracking rows have a small **x** at the end to stop tracking that flight from any airport page (not for flights listed under `tracked_flights` in the YAML). Flights are also removed automatically 2 hours after landing (option `track_remove_after_hours`, 0 = never; YAML flights are only hidden).
 - Split-flap tracking panel (full board and tracked-only card): no yellow row highlight, plain black tiles with white letters.

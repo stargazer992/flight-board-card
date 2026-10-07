@@ -370,6 +370,7 @@ th .sorth.on { color:var(--fg); }
 .board.mini { padding:0 !important; background:transparent !important; box-shadow:none !important; border:0 !important; }
 .board.mini .top, .board.mini .trkbar, .board.mini .foot { display:none !important; }
 .board.mini .trkcols { margin-bottom:0; }
+.board.mini .trk .ph { display:none !important; }
 .foot { color:var(--sub); font-size:calc(var(--fs) * .55); margin:10px 4px 0; text-align:right; }
 
 .board.classic { --bg:#0a0a0a; --fg:#ffd21f; --font:"Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;

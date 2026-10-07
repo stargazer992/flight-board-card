@@ -296,6 +296,7 @@ tr:nth-child(even) td { background:var(--zebra); }
 .c { width:34%; font-weight:700; text-transform:var(--cityCase); color:var(--city); }
 .f { width:16%; color:var(--flight); }
 .g { width:10%; color:var(--flight); font-weight:700; }
+table.ft .t { width:11%; } table.ft .c { width:12%; } table.ft .f { width:13%; } table.ft .g { width:10%; } table.ft .s { width:40%; }
 .hg .t { width:12%; } .hg .c { width:27%; } .hg .f { width:14%; } .hg .g { width:14%; } .hg .s { width:33%; }
 .h12 .hg .t { width:15%; } .h12 .hg .c { width:24%; }
 tr[data-rk] { cursor:pointer; }
@@ -1773,6 +1774,20 @@ th .sorth.on { color:var(--fg); }
     }
     return out;
   }
+  // From and To (city, code) of a tracked row: real route from the live/schedule data, else the board airport on the other side
+  _ends(r, kind) {
+    const lv = this._liveByKeys(r.idk || r.keys), sc = this._schedByKeys(r.idk || r.keys), raw = r.raw || {}, ap = this._ap();
+    const pk = (...v) => { for (const x of v) if (x !== undefined && x !== null && String(x).trim() !== "" && String(x).toLowerCase() !== "n/a") return String(x); return ""; };
+    const dbA = fbcDb().find(x => x.iata === ap.iata), mine = { c: pk(ap.city, dbA && dbA.city, ap.name), k: ap.iata || "" }, other = { c: r.c || "", k: r.code || "" };
+    let from = kind === "arr" ? other : mine, to = kind === "arr" ? mine : other;
+    const oc = pk(lv && lv.airport_origin_city, sc && sc.airport_origin_city, raw.airport_origin_city, lv && lv.airport_origin_name, sc && sc.airport_origin_name);
+    const dc = pk(lv && lv.airport_destination_city, sc && sc.airport_destination_city, raw.airport_destination_city, lv && lv.airport_destination_name, sc && sc.airport_destination_name);
+    const ok = pk(lv && lv.airport_origin_code_iata, sc && sc.airport_origin_code_iata, raw.airport_origin_code_iata);
+    const dk = pk(lv && lv.airport_destination_code_iata, sc && sc.airport_destination_code_iata, raw.airport_destination_code_iata);
+    if (oc || ok) from = { c: oc || from.c, k: ok || from.k };
+    if (dc || dk) to = { c: dc || to.c, k: dk || to.k };
+    return { from, to };
+  }
   _table(rows, kind, pfx) {
     if (rows === null) return `<div class="empty">Sensor not available</div>`;
     if (!rows.length) return `<div class="empty">${this._airline || this._window ? "No " + (this._airline ? this._esc(this._airline) + " " : "") + "flights in this window" : "No flights right now"}</div>`;
@@ -1780,24 +1795,26 @@ th .sorth.on { color:var(--fg); }
     const flap = this._theme === "splitflap", n = this._tiles4();
     // Gate column: only in the tracker panels, and only when a tracked flight has gate or terminal data
     const hasG = pfx === "trk" && this._gateTiles > 0;
+    // Tracked-only card: separate From and To columns instead of the single Destination / From column
+    const ft = pfx === "trk" && this._config.show === "tracked";
     // London style: gate (departures) or baggage belt (arrivals) for every flight, when the gate sensor knows any
     const lon = this._theme === "london";
     const bg = !pfx && lon && rows.some(r => this._boardGate(r));
     // Column titles are buttons that sort the board (not in the tracking panel)
     const sh = (k, label) => pfx === "trk" ? label :
       `<span class="sorth${this._sortKey === k ? " on" : ""}" data-sk="${k}" title="Sort by ${label.toLowerCase()}">${label}${this._sortKey === k ? (this._sortDir === -1 ? " &#9660;" : " &#9650;") : ""}</span>`;
-    const head = `<tr><th class="t">${sh("time", "Time")}</th><th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th><th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th></tr>`;
+    const head = `<tr><th class="t">${sh("time", "Time")}</th>${ft ? `<th class="c">From</th><th class="c">To</th>` : `<th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th>`}<th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th></tr>`;
     let tstyle = "";
-    if (hasG && flap) {
-      const tot = n.t + n.c + n.f + n.s + this._gateTiles;
-      tstyle = ` style="--wt:${(100 * n.t / tot).toFixed(2)}%;--wc:${(100 * n.c / tot).toFixed(2)}%;--wf:${(100 * n.f / tot).toFixed(2)}%;--ws:${(100 * n.s / tot).toFixed(2)}%;--wg:${(100 * this._gateTiles / tot).toFixed(2)}%"`;
+    if ((hasG || ft) && flap) {
+      const gt = hasG ? this._gateTiles : 0, tot = n.t + (ft ? 8 : n.c) + n.f + n.s + gt;
+      tstyle = ` style="--wt:${(100 * n.t / tot).toFixed(2)}%;--wc:${(100 * (ft ? 4 : n.c) / tot).toFixed(2)}%;--wf:${(100 * n.f / tot).toFixed(2)}%;--ws:${(100 * n.s / tot).toFixed(2)}%;--wg:${(100 * gt / tot).toFixed(2)}%"`;
     }
     const body = rows.map((r, i) => {
       const rk = this._rk(r, (pfx || "") + kind + i);
       const gi = hasG ? this._gateOf(r) : null;
       if (flap) {
         const k = (pfx || "") + kind + i;
-        return `<tr${this._trkClass(r)}${rk}><td class="t">${this._tiles(this._compact(r.t).padStart(n.t, " "), n.t, k + "t")}</td><td class="c">${this._tiles(r.c, n.c, k + "c")}</td>` +
+        return `<tr${this._trkClass(r)}${rk}><td class="t">${this._tiles(this._compact(r.t).padStart(n.t, " "), n.t, k + "t")}</td>${ft ? (e => `<td class="c">${this._tiles(e.from.k || e.from.c, 4, k + "c")}</td><td class="c">${this._tiles(e.to.k || e.to.c, 4, k + "d")}</td>`)(this._ends(r, kind)) : `<td class="c">${this._tiles(r.c, n.c, k + "c")}</td>`}` +
           `<td class="f">${this._tiles(r.fl, n.f, k + "f")}</td>${gi ? `<td class="g">${this._tiles(gi.flap, this._gateTiles, k + "g")}</td>` : ""}<td class="s ${r.cls}">${this._tiles(this._flapStatus(r.s, n.s), n.s, k + "s")}</td></tr>`;
       }
       const pk = (pfx || "") + kind + r.id;
@@ -1808,10 +1825,10 @@ th .sorth.on { color:var(--fg); }
       if (lon) { sw = this._lonWord(sw, stt); swShort = this._lonWord(swShort, stt); }
       const inner = `<div class="st"><span class="sw" data-short="${this._esc(swShort)}">${this._esc(sw)}</span>${stt ? `<span class="stt">${this._esc(stt)}</span>` : ""}</div>`;
       const sCell = changed ? `<div class="flip">${inner}</div>` : inner;
-      return `<tr${this._trkClass(r)}${rk}><td class="t">${this._esc(r.t)}</td><td class="c">${this._esc(r.c)} <span class="sub">${this._esc(r.code)}</span></td>` +
+      return `<tr${this._trkClass(r)}${rk}><td class="t">${this._esc(r.t)}</td>${ft ? (e => `<td class="c">${this._esc(e.from.k || e.from.c)}</td><td class="c">${this._esc(e.to.k || e.to.c)}</td>`)(this._ends(r, kind)) : `<td class="c">${this._esc(r.c)} <span class="sub">${this._esc(r.code)}</span></td>`}` +
         `<td class="f">${this._esc(r.fl)}<span class="sub">${this._esc(r.al)}</span></td>${gi ? `<td class="g">${this._esc(gi.g || "-")}<span class="sub">${this._esc(gi.sub)}</span></td>` : bg ? `<td class="g">${this._esc(this._boardGate(r))}</td>` : ""}<td class="s ${r.cls}">${sCell}</td></tr>`;
     }).join("");
-    return `<table${hasG || bg ? ' class="hg"' : ""}${tstyle}>${head}${body}</table>`;
+    return `<table${ft ? ' class="ft' + (hasG ? " hg" : "") + '"' : hasG || bg ? ' class="hg"' : ""}${tstyle}>${head}${body}</table>`;
   }
   // Raleigh style status: "On Time", orange new time when late, green Departed / Arrived / In Air
   _rdStatus(r) {

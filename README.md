@@ -135,7 +135,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `show_gate` | `true` | Show a Gate column (gate, terminal, baggage belt) in the tracking panels. Needs the companion script |
 | `flight_popup` | `true` | Click any flight on the board to open a details pop-up (times, gate, baggage belt, position, altitude, time to landing) |
 | `gates_entity` | `sensor.flight_board_gates` | London style only: sensor with the gate (departures) and baggage belt (arrivals) of every flight on the board. Published by the companion script |
-| `tracked_controls` | `false` | With `show: tracked`: also show the title, clock, style menu and Track flight box. Off = only the tracking panel |
+| `tracked_controls` | `false` | With `show: tracked`: also show the title, clock, style menu and Track flight box. Off = only the flight bar(s) |
 | `time_zone_mode` | `airport` | Pop-up times: `airport` = departure in the origin's local time and arrival in the destination's (with CDT/PDT etc.); `board` = everything in the board airport's time. The **Times** button in the pop-up switches it and is remembered per device |
 | `full_board_entity` | `sensor.flight_board_full` | Longer list of flights from the companion script, merged into the board so long time windows and airline filters show all flights. Empty = off |
 | `airline_logos` | (none) | Raleigh style: your own logo images by airline code, for example `{AA: /local/logos/aa.png, DL: /local/logos/dl.png}`. Put the image files in `/config/www/logos/`. Without a logo the airline name is shown as text. No logos are bundled with the card |

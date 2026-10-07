@@ -13,6 +13,11 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
 ## Features
 
 - Departures and arrivals side by side (or stacked, or only one of them)
+- **Added in this fork:**
+  - **Airline filter**: dropdown on the card (AA, DL, UA by default); add or remove airlines right on the card, and hide private and charter flights
+  - **Time window**: dropdown to show only the next 1, 2, 4, 8, 12 or 24 hours
+  - **Flight tracker**: pick a flight from the board, or type a flight number or tail number, to pin its status in a Tracking panel. Flights that are not on the board yet are followed through the Flightradar24 integration (live ETA, altitude and speed once airborne), with an optional schedule script for flights that have not departed
+  - **Split-flap flipping**: letters and numbers scroll through the drum before settling on the right character, like a real board
 - Six board styles, selectable from a menu on the card itself:
   - **Classic**: black and yellow
   - **Split-flap**: every letter on its own flap, letters flip when something changes

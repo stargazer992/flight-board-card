@@ -224,6 +224,7 @@ class FlightBoardCard extends HTMLElement {
 .board { border-radius:12px; padding:14px 16px 18px; font-variant-numeric: tabular-nums;
   background:var(--bg); color:var(--fg); font-family:var(--font); }
 .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:2px 4px 14px; flex-wrap:wrap; }
+.tl { display:flex; align-items:center; gap:18px; flex-wrap:wrap; min-width:0; }
 .name { font-size:calc(var(--fs) + 8px); font-weight:700; letter-spacing:1px; color:var(--title); text-transform:uppercase; }
 .name small { color:var(--accent); margin-left:10px; font-size:var(--fs); }
 .right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; min-width:0; max-width:100%; }
@@ -278,7 +279,7 @@ tr.trkd td:first-child { border-left:4px solid #ffd21f; }
 .thitem.on, .alitem.on { color:#ffd21f; font-weight:700; }
 .alitem b { color:#ffd21f; margin-right:6px; }
 .apnone { padding:10px 12px; color:#999; font-size:calc(var(--fs) * .68); }
-.clock { font-size:calc(var(--fs) + 10px); font-weight:700; color:var(--clock); letter-spacing:2px; white-space:nowrap; }
+.clock { font-size:calc(var(--fs) + 8px); font-weight:700; color:var(--clock); letter-spacing:2px; white-space:nowrap; }
 .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .cols.one, .cols.stacked { grid-template-columns:1fr; }
 @media (max-width: 900px) { .cols { grid-template-columns:1fr; } }
@@ -318,7 +319,8 @@ th .sorth.on { color:var(--fg); }
 .board.narrow .right { width:100%; justify-content:flex-start; gap:8px; }
 .board.narrow .apbox { flex:1 1 100%; }
 .board.narrow .apin { width:100%; box-sizing:border-box; }
-.board.narrow .clock { font-size:calc(var(--fs) + 2px); letter-spacing:1px; margin-left:auto; }
+.board.narrow .clock { font-size:calc(var(--fs) + 2px); letter-spacing:1px; }
+.board.narrow.splitflap .clock { font-size:calc((var(--fs) + 2px) * .8); }
 .board.narrow .right { position:relative; }
 .board.narrow .apbox, .board.narrow .thbox, .board.narrow .albox, .board.narrow .wnbox, .board.narrow .rnbox, .board.narrow .trbox { position:static; }
 .board.narrow .apres, .board.narrow .thres, .board.narrow .alres, .board.narrow .wnres, .board.narrow .rnres, .board.narrow .trres { left:0; right:0; width:auto; }
@@ -409,6 +411,7 @@ th .sorth.on { color:var(--fg); }
 .ch.s2 { animation: chs2 var(--stepms, 55ms) linear both; }
 @keyframes chs1 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }
 @keyframes chs2 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }
+.board.splitflap .clock { font-size:calc((var(--fs) + 8px) * .72); letter-spacing:0; }
 .board.splitflap .clock .ch { width:.8em; }
 
 .board.digital { --bg:#1e2124; --fg:#fff; --font:"Arial Narrow","Roboto Condensed",Arial,sans-serif;
@@ -484,8 +487,8 @@ th .sorth.on { color:var(--fg); }
     const arr = `<div class="panel"><div class="ph">${this._icon("arr")}Arrivals</div><div class="arr"></div></div>`;
     this.shadowRoot.innerHTML = `<style>${this._css()}</style>
 <div class="board${tro && c.tracked_controls !== true ? " mini" : ""}">
-  <div class="top"><div class="name"></div>
-    <div class="right">${c.show_airport_selector && !tro ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${tro ? "" : this._alHtml() + this._wnHtml() + this._rnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}<div class="clock"></div></div></div>
+  <div class="top"><div class="tl"><div class="name"></div><div class="clock"></div></div>
+    <div class="right">${c.show_airport_selector && !tro ? `<div class="apbox"><input class="apin" type="search" autocomplete="off" spellcheck="false" placeholder="Search airport"><div class="apres"></div></div>` : ""}${tro ? "" : this._alHtml() + this._wnHtml() + this._rnHtml()}${this._trBtnHtml()}${c.show_selector ? `<div class="thbox"><button class="thbtn" type="button" title="Board style"></button><div class="thres"></div></div>` : ""}</div></div>
   ${this._trkHtml()}
   <div class="${colsCls}"${tro ? ' style="display:none"' : ""}>${tro ? "" : (show !== "arrivals" ? dep : "") + (show !== "departures" ? arr : "")}</div>
   <div class="msg" style="display:none"></div>

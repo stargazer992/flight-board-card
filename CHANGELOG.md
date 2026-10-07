@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- The clock now sits next to the airport name on the title line, in the same size as the name (in the Split-flap style the flip tiles are scaled to match) instead of large at the far right.
 - Tracking rows have a small **x** at the end to stop tracking that flight from any airport page (not for flights listed under `tracked_flights` in the YAML). Flights are also removed automatically 2 hours after landing (option `track_remove_after_hours`, 0 = never; YAML flights are only hidden).
 - Split-flap tracking panel (full board and tracked-only card): no yellow row highlight, plain black tiles with white letters.
 - Tracking panel (full board and tracked-only card): the Time and Status columns now describe the arrival, in the destination airport's local time whichever airport the flight was listed on. The Status column is a plain word: ON TIME, DELAYED (15+ minutes late), EARLY (10+ minutes early), LANDED, DIVERTED or CANCELLED, with the date added when it arrives on another day. Not yet in the Raleigh style, which keeps its own layout.

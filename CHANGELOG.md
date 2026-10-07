@@ -2,6 +2,7 @@
 
 ## 1.10.0 (fork)
 - Click a column title to sort the board on it, in every style (Time, Destination/From, Flight, Gate, Status; Raleigh also City and Airline); click again to reverse. Remembered per device. Option `sort` sets the starting order.
+- Phones: column titles and the DEPARTURES / ARRIVALS / TRACKING banner shrink on narrow panels so they no longer overlap or wrap (all styles except Raleigh and London, which have their own sizing).
 - Script: position fallbacks so a flying aircraft always has a position: OpenSky, then Flightradar24 (integration position, flight track), Aviationstack (on click), then an estimate along the route. The pop-up names the source ("Position - Estimated"). Fresh OpenSky data always wins.
 - Script: optional Aviationstack source (free plan) for gate, terminal and baggage belt, asked only when a flight is clicked, cached for an hour and capped per month.
 - Raleigh: pop-up text is now readable (it was white on white).

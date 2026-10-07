@@ -281,6 +281,12 @@ tr[data-rk] { cursor:pointer; }
 th .sorth { cursor:pointer; user-select:none; -webkit-user-select:none; }
 th .sorth:hover { text-decoration:underline; }
 th .sorth.on { color:var(--fg); }
+.board.narrow:not(.raleigh) th { font-size:10px; letter-spacing:.6px; padding:7px 4px 5px; white-space:nowrap; overflow:hidden; text-overflow:clip; }
+.board.narrow:not(.raleigh) th .sorth { white-space:nowrap; }
+.board.tiny:not(.raleigh) th { font-size:9px; letter-spacing:.2px; padding-left:3px; padding-right:3px; }
+.board.narrow:not(.raleigh):not(.london) .ph { letter-spacing:2px; font-size:calc(var(--fs) * .8); padding:8px 10px; white-space:nowrap; gap:8px; }
+.board.narrow.splitflap .ph { letter-spacing:2px; }
+.board.tiny:not(.raleigh):not(.london) .ph { letter-spacing:1px; font-size:calc(var(--fs) * .7); }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
 .pclose { position:absolute; top:8px; right:12px; background:none; border:0; color:var(--sub); font-size:28px; line-height:1; cursor:pointer; padding:4px 8px; }
@@ -934,6 +940,9 @@ th .sorth.on { color:var(--fg); }
       b.style.setProperty("--hmin", himg ? "calc(var(--fs) * 5.2)" : "0");
     }
     if (!b || !p || !p.clientWidth) return;
+    // Narrow panels (phones): smaller column titles and banner so nothing overlaps or wraps
+    b.classList.toggle("narrow", p.clientWidth < 560);
+    b.classList.toggle("tiny", p.clientWidth < 400);
     const n = this._tiles4(), tot = n.t + n.c + n.f + n.s;
     const fs = Number(this._config.font_size) || 22;
     const f = Math.max(9, Math.min(fs, ((p.clientWidth - 56) / (tot + (this._gateTiles || 0)) - 2) / 0.78));

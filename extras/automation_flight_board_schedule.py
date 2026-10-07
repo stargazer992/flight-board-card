@@ -15,8 +15,10 @@
 #     (live or not), the optional EXTRA_FLIGHTS list below, and every flight the
 #     card asks about (pyscript.flight_board_lookup, sent when you open a pop-up
 #     or track a flight). Card requests expire after WATCH_MINUTES.
-#   - Schedule, gate, terminal and belt come from the same Flightradar24 data
-#     that the flightradar24.com flight page uses.
+#   - Schedule comes from the same Flightradar24 data that the flightradar24.com
+#     flight page uses. Gate, terminal and belt come from the Flightradar24 flight
+#     detail view (flights in the air) and from the airport board of the airport
+#     the card shows (flights that have not departed yet).
 #   - OpenSky is only asked for flights that are airborne, at most once per
 #     OPENSKY_REFRESH_SECONDS per flight.
 #   - Results are cached so Flightradar24 is asked at most once per CACHE_SECONDS.
@@ -72,6 +74,16 @@ FETCH_TIMEOUT_SECONDS = 15
 # the detail view of a single flight has them). Used for the chosen flight only.
 FR24_DETAIL_URL = "https://data-live.flightradar24.com/clickhandler/?version=1.5&flight={flight_id}"
 
+# Flightradar24 airport board for YOUR airport (the one the card shows). Unlike the
+# flight list it carries gate, terminal and baggage belt for flights that have not
+# departed yet. Two requests (departures + arrivals) per BOARD_CACHE_SECONDS.
+FR24_BOARD_URL = "https://api.flightradar24.com/common/v1/airport.json?code={code}&plugin[]=schedule&plugin-setting[schedule][mode]={mode}&page=1&limit=100"
+# Entity that holds the airport the card shows (Flightradar24 integration)
+HOME_AIRPORT_ENTITY = "text.flightradar24_airport_track"
+BOARD_CACHE_SECONDS = 600
+# A board entry only matches a flight when its scheduled departure is within this many seconds
+BOARD_MATCH_SECONDS = 6 * 3600
+
 # Second gate source (optional): AeroDataBox through RapidAPI. It lists gate,
 # terminal and baggage belt per flight. Subscribe to the free plan at
 # https://rapidapi.com/aedbx-aedbx/api/aerodatabox and paste your key here.
@@ -125,6 +137,7 @@ SCHEDULE_STATE = {
     "cache": {},       # code -> {"at": ts, "leg": dict or None}
     "os_cache": {},    # code -> {"at": ts, "data": dict or None}
     "adb_cache": {},   # code -> {"at": ts, "fields": dict}
+    "board_cache": {}, # "airport|mode" -> {"at": ts, "items": {flight number: [entries]}}
     "watch": {},       # code -> expiry timestamp (asked by the card)
     "token": {"value": "", "expires": 0},
     "busy": False,
@@ -307,6 +320,89 @@ def fb_sched_add_details(leg):
         log.warning(f"{LOG_PREFIX}: gate details for {leg.get('flight_number')} failed: {e}")
 
 
+def fb_sched_board(code, mode):
+    # Gate data of one airport board, cached. Returns {flight number: [entries]} where
+    # an entry is {"dep": scheduled departure, "fields": gate dict}. Raises on errors.
+    cache = SCHEDULE_STATE["board_cache"]
+    key = code + "|" + mode
+    now = time.time()
+    entry = cache.get(key)
+    if entry is not None and now - entry["at"] < BOARD_CACHE_SECONDS:
+        return entry["items"]
+    url = FR24_BOARD_URL.replace("{code}", code.lower()).replace("{mode}", mode)
+    payload = fb_sched_http_json(url)
+    rows = fb_sched_get(payload, ["result", "response", "airport", "pluginData", "schedule", mode, "data"]) or []
+    items = {}
+    for row in rows:
+        try:
+            fl = None
+            if isinstance(row, dict):
+                fl = row.get("flight") if isinstance(row.get("flight"), dict) else row
+            number = fb_sched_norm(fb_sched_get(fl, ["identification", "number", "default"]))
+            if not number:
+                continue
+            fields = {
+                "airport_origin_gate": fb_sched_clean(fb_sched_get(fl, ["airport", "origin", "info", "gate"])),
+                "airport_origin_terminal": fb_sched_clean(fb_sched_get(fl, ["airport", "origin", "info", "terminal"])),
+                "airport_origin_baggage": fb_sched_clean(fb_sched_get(fl, ["airport", "origin", "info", "baggage"])),
+                "airport_destination_gate": fb_sched_clean(fb_sched_get(fl, ["airport", "destination", "info", "gate"])),
+                "airport_destination_terminal": fb_sched_clean(fb_sched_get(fl, ["airport", "destination", "info", "terminal"])),
+                "airport_destination_baggage": fb_sched_clean(fb_sched_get(fl, ["airport", "destination", "info", "baggage"])),
+            }
+            dep = fb_sched_get(fl, ["time", "scheduled", "departure"])
+            if number not in items:
+                items[number] = []
+            items[number].append({"dep": dep, "fields": fields})
+        except Exception as e:
+            log.warning(f"{LOG_PREFIX}: skipped a malformed board row: {e}")
+    cache[key] = {"at": now, "items": items}
+    return items
+
+
+def fb_sched_add_board_gates(leg):
+    # Fill gate, terminal and belt that are still empty from the airport board of the
+    # airport the card shows. A failure only logs a warning.
+    try:
+        home = None
+        try:
+            home = state.get(HOME_AIRPORT_ENTITY)
+        except Exception:
+            home = None
+        home = fb_sched_norm(home)
+        if not home or home in ("UNKNOWN", "UNAVAILABLE"):
+            return
+        number = fb_sched_norm(leg.get("flight_number"))
+        if not number:
+            return
+        modes = []
+        for side, mode in [("origin", "departures"), ("destination", "arrivals")]:
+            codes = [
+                fb_sched_norm(leg.get("airport_" + side + "_code_icao")),
+                fb_sched_norm(leg.get("airport_" + side + "_code_iata")),
+            ]
+            if home in codes:
+                modes.append(mode)
+        dep = leg.get("time_scheduled_departure")
+        for mode in modes:
+            items = fb_sched_board(home, mode)
+            best = None
+            best_dist = 0
+            for entry in items.get(number, []):
+                if entry["dep"] is None or dep is None:
+                    continue
+                dist = abs(entry["dep"] - dep)
+                if dist <= BOARD_MATCH_SECONDS and (best is None or dist < best_dist):
+                    best = entry
+                    best_dist = dist
+            if best is None:
+                continue
+            for key in best["fields"]:
+                if best["fields"][key] and not leg.get(key):
+                    leg[key] = best["fields"][key]
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: airport board gates failed for {leg.get('flight_number')}: {e}")
+
+
 def fb_sched_add_aerodatabox(code, leg):
     # Second gate source. Fills gate, terminal and belt that are still empty.
     # A failure only logs a warning: the leg is published without those values.
@@ -382,6 +478,7 @@ def fb_sched_fetch(code):
     best = fb_sched_pick(legs, time.time())
     if best is not None:
         fb_sched_add_details(best)
+        fb_sched_add_board_gates(best)
         fb_sched_add_aerodatabox(code, best)
     return best
 

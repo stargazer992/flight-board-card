@@ -68,7 +68,7 @@ const FBC_DEFAULTS = {
   show_gate: true, flight_popup: true,
   lookup_service: "pyscript.flight_board_lookup",
   // London style: gate (departures) and belt (arrivals) for every flight, from extras/automation_flight_board_schedule.py
-  gates_entity: "sensor.flight_board_gates",
+  gates_entity: "sensor.flight_board_gates", full_board_entity: "sensor.flight_board_full",
   // Raleigh style: your own airline logo images, e.g. { AA: "/local/logos/aa.png", DL: "/local/logos/dl.png" }. Without one the airline name is shown as text
   airline_logos: {},
   flip_cycle: true, flip_on_load: true, flip_step_ms: 55, flip_max_steps: 24,
@@ -1074,12 +1074,27 @@ th .sorth.on { color:var(--fg); }
   _filt(entityId, kind, win) {
     const st = this._hass.states[entityId];
     if (!st || !Array.isArray(st.attributes.flights)) return null;
+    // The integration lists only the next 50 flights: add the longer board from the companion script
+    let base = st.attributes.flights;
+    try {
+      const fe = this._config.full_board_entity;
+      const fs = fe && this._hass.states[fe];
+      const extra = fs && fs.attributes && fs.attributes[kind === "dep" ? "departures" : "arrivals"];
+      if (Array.isArray(extra) && extra.length) {
+        const tkey = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
+        const seen = {};
+        for (const f of base) if (f) seen[this._trkNorm(f.flight_number || f.callsign) + "|" + f[tkey]] = 1;
+        const add = [];
+        for (const f of extra) if (f && !seen[this._trkNorm(f.flight_number || f.callsign) + "|" + f[tkey]]) add.push(f);
+        if (add.length) base = base.concat(add);
+      }
+    } catch (e) {}
     const keep = Date.now() / 1000 - (Number(this._config.past_minutes) || 0) * 60;
     const key = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
     const rkey = kind === "dep" ? "time_real_departure" : "time_real_arrival";
     const al = this._airline, hp = this._config.hide_private !== false;
     const lim = Date.now() / 1000 + win * 3600;
-    return st.attributes.flights.filter(f => f && f[key]).filter(f => (f[rkey] || f[key]) >= keep)
+    return base.filter(f => f && f[key]).filter(f => (f[rkey] || f[key]) >= keep)
       .filter(f => !hp || f.airline_iata)
       .filter(f => !win || f[key] <= lim)
       .filter(f => !al || String(f.airline_iata || "").toUpperCase() === al)
@@ -1466,10 +1481,16 @@ th .sorth.on { color:var(--fg); }
   _seenAirlines() {
     const seen = {};
     const ids = [this._config.departures_entity, this._config.arrivals_entity];
+    const fbs = this._config.full_board_entity && this._hass && this._hass.states[this._config.full_board_entity];
     for (const id of ids) {
       const st = this._hass && this._hass.states[id];
       if (!st || !Array.isArray(st.attributes.flights)) continue;
-      for (const f of st.attributes.flights) {
+      let lst = st.attributes.flights;
+      try {
+        const ex = fbs && fbs.attributes && fbs.attributes[id === this._config.departures_entity ? "departures" : "arrivals"];
+        if (Array.isArray(ex)) lst = lst.concat(ex);
+      } catch (e) {}
+      for (const f of lst) {
         if (!f || !f.airline_iata) continue;
         const k = String(f.airline_iata).toUpperCase();
         const nm = String(f.airline_short || f.airline || k);

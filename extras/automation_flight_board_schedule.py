@@ -84,10 +84,25 @@ FR24_DETAIL_URL = "https://data-live.flightradar24.com/clickhandler/?version=1.5
 # Flightradar24 airport board for YOUR airport (the one the card shows). Unlike the
 # flight list it carries gate, terminal and baggage belt for flights that have not
 # departed yet. Two requests (departures + arrivals) per BOARD_CACHE_SECONDS.
-FR24_BOARD_URL = "https://api.flightradar24.com/common/v1/airport.json?code={code}&plugin[]=schedule&plugin-setting[schedule][mode]={mode}&page=1&limit=100"
+FR24_BOARD_URL = "https://api.flightradar24.com/common/v1/airport.json?code={code}&plugin[]=schedule&plugin-setting[schedule][mode]={mode}&page={page}&limit=100"
 # Entity that holds the airport the card shows (Flightradar24 integration)
 HOME_AIRPORT_ENTITY = "text.flightradar24_airport_track"
 BOARD_CACHE_SECONDS = 600
+
+# FULL BOARD (more hours than the integration lists)
+# The Flightradar24 integration only lists the NEXT 50 flights per direction (about 3
+# hours at a busy airport), so a long time window or an airline filter shows only
+# those. This script reads more pages of the same airport board and publishes them in
+# FULL_BOARD_SENSOR; the card merges them in when needed. Each page holds up to 100
+# flights; FULL_BOARD_PAGES = 2 is roughly 10 to 12 hours at a mid-size airport.
+# Set FULL_BOARD_ENABLED = False to switch it off (pages then drop back to 1).
+# The sensor is large: exclude it from the recorder (see the README).
+FULL_BOARD_ENABLED = True
+FULL_BOARD_PAGES = 2
+FULL_BOARD_MAX = 250
+FULL_BOARD_SENSOR = "sensor.flight_board_full"
+FULL_BOARD_NAME = "Flight board full"
+FULL_BOARD_ICON = "mdi:airplane-clock"
 
 # Gate sensor for the card's London style: gate (departures) and baggage belt
 # (arrivals) of every flight on the airport board, in one small sensor.
@@ -375,10 +390,28 @@ def fb_sched_board(code, mode):
     entry = cache.get(key)
     if entry is not None and now - entry["at"] < BOARD_CACHE_SECONDS:
         return entry["items"]
-    url = FR24_BOARD_URL.replace("{code}", code.lower()).replace("{mode}", mode)
-    payload = fb_sched_http_json(url)
-    rows = fb_sched_get(payload, ["result", "response", "airport", "pluginData", "schedule", mode, "data"]) or []
+    rows = []
+    pages = FULL_BOARD_PAGES if FULL_BOARD_ENABLED else 1
+    if pages < 1:
+        pages = 1
+    if pages > 5:
+        pages = 5
+    for page in range(1, pages + 1):
+        url = FR24_BOARD_URL.replace("{code}", code.lower()).replace("{mode}", mode).replace("{page}", str(page))
+        try:
+            payload = fb_sched_http_json(url)
+        except Exception as e:
+            if page == 1:
+                raise
+            # A later page failing only means fewer hours; keep what we have
+            log.warning(f"{LOG_PREFIX}: airport board page {page} ({mode}) failed: {e}")
+            break
+        got = fb_sched_get(payload, ["result", "response", "airport", "pluginData", "schedule", mode, "data"]) or []
+        if not got:
+            break
+        rows = rows + list(got)
     items = {}
+    flights = []
     for row in rows:
         try:
             fl = None
@@ -387,6 +420,7 @@ def fb_sched_board(code, mode):
             number = fb_sched_norm(fb_sched_get(fl, ["identification", "number", "default"]))
             if not number:
                 continue
+            flights.append(fl)
             fields = {
                 "airport_origin_gate": fb_sched_clean(fb_sched_get(fl, ["airport", "origin", "info", "gate"])),
                 "airport_origin_terminal": fb_sched_clean(fb_sched_get(fl, ["airport", "origin", "info", "terminal"])),
@@ -401,7 +435,7 @@ def fb_sched_board(code, mode):
             items[number].append({"dep": dep, "fields": fields})
         except Exception as e:
             log.warning(f"{LOG_PREFIX}: skipped a malformed board row: {e}")
-    cache[key] = {"at": now, "items": items}
+    cache[key] = {"at": now, "items": items, "flights": flights}
     return items
 
 
@@ -450,6 +484,85 @@ def fb_sched_publish_gates():
     except Exception as e:
         log.warning(f"{LOG_PREFIX}: could not publish {GATES_SENSOR}: {e}")
         return False
+
+
+def fb_sched_full_row(fl, mode):
+    # One board flight in the layout of the Flightradar24 integration's airport sensors,
+    # so the card can mix them. For departures the "airport" is the destination, for arrivals the origin.
+    leg = fb_sched_leg(fl)
+    side = "destination" if mode == "departures" else "origin"
+    row = {
+        "flight_id": leg.get("flight_id"),
+        "flight_number": leg.get("flight_number"),
+        "callsign": leg.get("callsign"),
+        "aircraft_registration": leg.get("aircraft_registration"),
+        "aircraft_model": leg.get("aircraft_model"),
+        "aircraft_code": leg.get("aircraft_code"),
+        "airline": leg.get("airline"),
+        "airline_short": leg.get("airline_short"),
+        "airline_iata": leg.get("airline_iata"),
+        "airline_icao": leg.get("airline_icao"),
+        "airport_name": leg.get("airport_" + side + "_name"),
+        "airport_code_iata": leg.get("airport_" + side + "_code_iata"),
+        "airport_code_icao": leg.get("airport_" + side + "_code_icao"),
+        "airport_city": leg.get("airport_" + side + "_city"),
+        "status_text": leg.get("status_text"),
+        "time_scheduled_departure": leg.get("time_scheduled_departure"),
+        "time_scheduled_arrival": leg.get("time_scheduled_arrival"),
+        "time_estimated_departure": leg.get("time_estimated_departure"),
+        "time_estimated_arrival": leg.get("time_estimated_arrival"),
+        "time_real_departure": leg.get("time_real_departure"),
+        "time_real_arrival": leg.get("time_real_arrival"),
+    }
+    return row
+
+
+def fb_sched_publish_full():
+    # Publish the longer board (more hours than the integration) in FULL_BOARD_SENSOR.
+    # Never raises; the card works without it.
+    if not FULL_BOARD_ENABLED:
+        return
+    try:
+        home = None
+        try:
+            home = state.get(HOME_AIRPORT_ENTITY)
+        except Exception:
+            home = None
+        home = fb_sched_norm(home)
+        if not home or home in ("UNKNOWN", "UNAVAILABLE"):
+            return
+        out = {"departures": [], "arrivals": []}
+        now = time.time()
+        for mode in ["departures", "arrivals"]:
+            fb_sched_board(home, mode)
+            entry = SCHEDULE_STATE["board_cache"].get(home + "|" + mode)
+            flights = entry["flights"] if entry is not None else []
+            key = "time_scheduled_departure" if mode == "departures" else "time_scheduled_arrival"
+            rows = []
+            for fl in flights:
+                try:
+                    row = fb_sched_full_row(fl, mode)
+                    if row.get(key):
+                        rows.append(row)
+                except Exception as e:
+                    log.warning(f"{LOG_PREFIX}: skipped a board flight: {e}")
+            rows.sort(key=lambda r: r.get(key) or 0)
+            out[mode] = rows[:FULL_BOARD_MAX]
+        state.set(
+            FULL_BOARD_SENSOR,
+            value=len(out["departures"]) + len(out["arrivals"]),
+            new_attributes={
+                "departures": out["departures"],
+                "arrivals": out["arrivals"],
+                "airport": home,
+                "updated": now,
+                "icon": FULL_BOARD_ICON,
+                "friendly_name": FULL_BOARD_NAME,
+                "source": "flightradar24 airport board (several pages)",
+            },
+        )
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: could not publish {FULL_BOARD_SENSOR}: {e}")
 
 
 def fb_sched_add_board_gates(leg):
@@ -1138,6 +1251,7 @@ def fb_sched_rebuild():
         return
 
     gates_ok = fb_sched_publish_gates()
+    fb_sched_publish_full()
 
     if failures:
         fb_sched_notify_error(

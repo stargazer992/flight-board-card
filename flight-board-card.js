@@ -367,8 +367,8 @@ tr[data-rk] { cursor:pointer; }
 .board.raleigh td.rc { width:35%; }
 .board.raleigh td.rc b { display:block; font-size:calc(var(--fs) * .78); font-weight:800; letter-spacing:.3px; color:var(--city); text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; }
 .board.raleigh td.rc span, .board.raleigh td.rf span.rfn { display:block; font-size:calc(var(--fs) * .52); color:var(--time); font-weight:500; }
-.board.raleigh td.rf { width:27%; font-weight:700; }
-.board.raleigh td.rf img.alogo { display:block; max-height:calc(var(--fs) * .95); max-width:100%; object-fit:contain; margin-bottom:1px; }
+.board.raleigh td.rf, .board.raleigh th.rf { width:27%; font-weight:700; text-align:center; }
+.board.raleigh td.rf img.alogo { display:block; max-height:calc(var(--fs) * .95); max-width:100%; object-fit:contain; margin:0 auto 1px; }
 .board.raleigh td.rf b.aname { display:block; font-size:calc(var(--fs) * .72); color:#10376f; font-weight:800; overflow:hidden; text-overflow:ellipsis; }
 .board.raleigh td.rg { width:12%; font-size:calc(var(--fs) * 1.05); font-weight:900; text-align:center; color:var(--city); }
 .board.raleigh th.rg { text-align:center; }

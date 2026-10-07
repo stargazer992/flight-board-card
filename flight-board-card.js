@@ -320,7 +320,7 @@ th .sorth.on { color:var(--fg); }
 .board.narrow .apbox { flex:1 1 100%; }
 .board.narrow .apin { width:100%; box-sizing:border-box; }
 .board.narrow .clock { font-size:calc(var(--fs) + 2px); letter-spacing:1px; }
-.board.narrow.splitflap .clock { font-size:calc((var(--fs) + 2px) * .8); }
+.board.narrow.splitflap .clock { font-size:var(--fs); }
 .board.narrow .right { position:relative; }
 .board.narrow .apbox, .board.narrow .thbox, .board.narrow .albox, .board.narrow .wnbox, .board.narrow .rnbox, .board.narrow .trbox { position:static; }
 .board.narrow .apres, .board.narrow .thres, .board.narrow .alres, .board.narrow .wnres, .board.narrow .rnres, .board.narrow .trres { left:0; right:0; width:auto; }
@@ -411,7 +411,7 @@ th .sorth.on { color:var(--fg); }
 .ch.s2 { animation: chs2 var(--stepms, 55ms) linear both; }
 @keyframes chs1 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }
 @keyframes chs2 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }
-.board.splitflap .clock { font-size:calc((var(--fs) + 8px) * .72); letter-spacing:0; }
+.board.splitflap .clock { font-size:var(--fs); letter-spacing:0; }
 .board.splitflap .clock .ch { width:.8em; }
 
 .board.digital { --bg:#1e2124; --fg:#fff; --font:"Arial Narrow","Roboto Condensed",Arial,sans-serif;

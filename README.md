@@ -3,6 +3,7 @@
 > **Fork notice.** This is a fork of the excellent [flight-board-card](https://github.com/pmnilsson/flight-board-card) by **P-M Nilsson**, who created the card, the board styles and the airport search. All credit for the original goes to him. This fork adds an airline filter, a time window, a flight tracker and a scrolling split-flap animation (see the options below and the [changelog](CHANGELOG.md)). Fork additions by **[@stargazer992](https://github.com/stargazer992)**.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![Validate](https://github.com/stargazer992/flight-board-card/actions/workflows/validate.yml/badge.svg)](https://github.com/stargazer992/flight-board-card/actions/workflows/validate.yml)
 
 An airport **departures and arrivals board** for your Home Assistant dashboard. It is built for wall panels and tablets: large, readable text, live status and six classic board styles, including a split-flap board with flipping letters.
 

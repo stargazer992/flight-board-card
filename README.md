@@ -123,6 +123,9 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `show_window_selector` | `true` | Show the time window dropdown (Any time / Next 1h ... 24h) on the card |
 | `time_windows` | 1, 2, 4, 8, 12, 24 | Hours offered in the time window dropdown |
 | `city_codes` | `auto` | Raleigh style: `auto` shows the airport code (ATL, MCO) instead of the city name when the names do not fit, for example on a phone; `always` or `never` forces it |
+| `sort` | `time` | `time` lists flights by time. `city` shows the nearest flights (per the time window and rows) A-Z by city, like a real airport board |
+| `header_image` | (none) | Raleigh style: your own picture behind the DEPARTURES and ARRIVALS banner, for example `/local/logos/flightboard/header.jpg` (a wide image, about 1200 x 250 px, with the right side clear for the title) |
+| `compact_time` | `true` | Raleigh style: times as `01:45PM` like the airport boards (12-hour clock) |
 | `show_rows_selector` | `true` | Show the Rows dropdown on the card. Picking a time window grows the rows to fit every flight in it; picking more rows than the window holds widens the window |
 | `row_options` | 6, 8, 10, 12, 16, 20, 30, 50 | Row counts offered in the Rows dropdown |
 | `max_rows` | 60 | Most rows shown when the rows follow the time window |

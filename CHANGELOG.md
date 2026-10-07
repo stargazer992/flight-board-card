@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Raleigh style closer to the real boards: option `sort: city` lists flights A-Z by city (airport code when codes are shown), `header_image` puts your own picture behind the DEPARTURES and ARRIVALS banner, and times read `01:45PM` (`compact_time`).
 - Raleigh style on small screens: when city names do not fit (a phone), the board shows airport codes (ATL, MCO) instead of truncated names. Option `city_codes`: `auto`, `always` or `never`.
 - New Rows dropdown next to the time window. The two work together: choosing a window shows every flight in it (up to `max_rows`), and choosing more rows than the window holds widens the window to the next one that has enough. `Auto` fits the rows to the window. Options: `show_rows_selector`, `row_options`, `max_rows`.
 - New Raleigh style after the boards at Raleigh-Durham: blue banner, white rows, City / Time, Airline / Flight, Gate and Status columns, "On Time", orange new time when late, green Departed / Arrived / In Air. Airline logos are your own images through the new `airline_logos` option (none are bundled); without one the airline name is shown. A logo is matched by IATA code, ICAO code or the letters at the start of the flight number (e.g. `MX` and `MXY`), not case-sensitive. Flight numbers show a space after the airline code ("F9 3330").

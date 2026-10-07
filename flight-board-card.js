@@ -56,7 +56,7 @@ const FBC_DEFAULTS = {
   theme: "classic", time_format: "24h", show: "both", layout: "auto", show_airline: true,
   show_selector: true, show_airport_selector: true,
   show_airline_selector: true, hide_private: true, airline: "",
-  allow_add_airlines: true, show_window_selector: true, time_window: 0, city_codes: "auto", show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50], max_rows: 60,
+  allow_add_airlines: true, show_window_selector: true, time_window: 0, city_codes: "auto", sort: "time", header_image: "", compact_time: true, show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50], max_rows: 60,
   show_flight_tracker: true,
   // Flights that are not on the airport board are followed through the Flightradar24 "additional tracked" feature
   track_via_integration: true,
@@ -368,7 +368,7 @@ tr[data-rk] { cursor:pointer; }
   --title:#fff; --accent:#cfe3ff; --clock:#fff; --panel:#fff; --hbg:linear-gradient(180deg,#5aa6ea 0%,#2f6fc4 55%,#1a4a96 100%); --hfg:#fff; --th:#56627a; --line:#cfd6e2; --line2:#dfe4ec;
   --zebra:#f1f4f9; --time:#5d6a80; --city:#101b33; --cityCase:uppercase; --flight:#5d6a80; --st:#101b33; --ok:#1f9d55; --warn:#e8741a; --bad:#e8741a; --brd:#1f9d55;
   --sub:#5d6a80; --selbg:#fff; --selfg:#101b33; }
-.board.raleigh .ph { text-transform:uppercase; letter-spacing:1px; font-weight:800; font-size:calc(var(--fs) + 8px); padding:10px 16px; justify-content:flex-end; text-shadow:0 2px 3px rgba(0,30,80,.55); }
+.board.raleigh .ph { background:var(--himg, none) left center / cover no-repeat, var(--hbg); min-height:var(--hmin, 0); box-sizing:border-box; text-transform:uppercase; letter-spacing:1px; font-weight:800; font-size:calc(var(--fs) + 8px); padding:10px 16px; justify-content:flex-end; text-shadow:0 2px 3px rgba(0,30,80,.55); }
 .board.raleigh .ph svg { filter:drop-shadow(0 1px 2px rgba(0,30,80,.6)); }
 .board.raleigh th { background:#e6ebf3; color:#56627a; text-transform:uppercase; letter-spacing:.8px; font-weight:700; font-size:calc(var(--fs) * .5); padding:4px 8px; border-bottom:1px solid #cfd6e2; }
 .board.raleigh td { padding:6px 8px; font-size:calc(var(--fs) * .8); border-bottom:1px solid var(--line2); color:var(--st); }
@@ -892,6 +892,12 @@ tr[data-rk] { cursor:pointer; }
     const b = this.shadowRoot && this.shadowRoot.querySelector(".board");
     const p = this.shadowRoot && this.shadowRoot.querySelector(".panel");
     this._cityFit();
+    // Raleigh style: optional picture behind the DEPARTURES / ARRIVALS banner (header_image)
+    if (b) {
+      const himg = String(this._config.header_image || "").trim().replace(/["\\\n]/g, "");
+      b.style.setProperty("--himg", himg ? 'url("' + himg + '")' : "none");
+      b.style.setProperty("--hmin", himg ? "calc(var(--fs) * 5.2)" : "0");
+    }
     if (!b || !p || !p.clientWidth) return;
     const n = this._tiles4(), tot = n.t + n.c + n.f + n.s;
     const fs = Number(this._config.font_size) || 22;
@@ -914,6 +920,15 @@ tr[data-rk] { cursor:pointer; }
         for (let i = 0; i < cs.length; i++) { if (cs[i].clientWidth && cs[i].scrollWidth > cs[i].clientWidth + 1) { on = true; break; } }
       }
       t.classList.toggle("codes", on && mode !== "never");
+      // A-Z order follows what is shown: by airport code when codes are on, by city name otherwise
+      if (String(this._config.sort || "time").toLowerCase() === "city") {
+        const sel = t.classList.contains("codes") ? "td.rc b.cod" : "td.rc b.cty";
+        const trs = Array.from(t.querySelectorAll("tr")).filter(tr => tr.querySelector("td.rc"));
+        const key = (tr) => { const e = tr.querySelector(sel); return e ? e.textContent : ""; };
+        const sorted = trs.map((tr, i) => ({ tr, i })).sort((x, y) => key(x.tr).localeCompare(key(y.tr)) || x.i - y.i);
+        const same = sorted.every((o, i) => o.tr === trs[i]);
+        if (!same) sorted.forEach(o => o.tr.parentNode.appendChild(o.tr));
+      }
     });
   }
   _applyTheme() {
@@ -1022,7 +1037,13 @@ tr[data-rk] { cursor:pointer; }
     const win = Number(this._window) || 0;
     const all = this._filt(entityId, kind, win);
     if (!all) return null;
-    return all.slice(0, this._rowCap(win)).map(f => this._rowOf(f, kind));
+    // The nearest flights first (time window and row limit), then optionally listed A-Z by city like a real board
+    const rows = all.slice(0, this._rowCap(win)).map(f => this._rowOf(f, kind));
+    if (String(this._config.sort || "time").toLowerCase() === "city") {
+      rows.forEach((r, i) => { r._i = i; });
+      rows.sort((x, y) => String(x.c).localeCompare(String(y.c)) || x._i - y._i);
+    }
+    return rows;
   }
   _rowOf(f, kind) {
     const key = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
@@ -1633,6 +1654,12 @@ tr[data-rk] { cursor:pointer; }
     const fnum = pre ? pre + " " + fl.slice(pre.length) : String(r.fl || "");
     return top + `<span class="rfn">${this._esc(fnum)}</span>`;
   }
+  // Board style time: 1:45 PM -> 01:45PM (12-hour clock only)
+  _rdTime(t) {
+    if (this._config.compact_time === false) return String(t);
+    const m = String(t).match(/^(\d{1,2}):(\d\d)\s*([AP]M)$/i);
+    return m ? (m[1].length < 2 ? "0" + m[1] : m[1]) + ":" + m[2] + m[3].toUpperCase() : String(t);
+  }
   _tableRaleigh(rows, kind, pfx) {
     const hasG = pfx === "trk" ? this._gateTiles > 0 : this._config.gates_entity && this._hass && !!this._hass.states[this._config.gates_entity];
     const head = `<tr><th class="rc">City / Time</th><th class="rf">Airline / Flight</th>${hasG ? '<th class="rg">Gate</th>' : ""}<th class="rs">Status</th></tr>`;
@@ -1644,7 +1671,7 @@ tr[data-rk] { cursor:pointer; }
       const prev = this._prev[pk], changed = prev !== undefined && prev !== r.s;
       this._prev[pk] = r.s;
       const sInner = changed ? `<div class="flip">${this._esc(st.t)}</div>` : this._esc(st.t);
-      return `<tr${this._trkClass(r)}${rk}><td class="rc"><b class="cty">${this._esc(r.c)}</b><b class="cod">${this._esc(r.code || r.c)}</b><span>${this._esc(r.t)}</span></td><td class="rf">${this._rdAirline(r)}</td>` +
+      return `<tr${this._trkClass(r)}${rk}><td class="rc"><b class="cty">${this._esc(r.c)}</b><b class="cod">${this._esc(r.code || r.c)}</b><span>${this._esc(this._rdTime(r.t))}</span></td><td class="rf">${this._rdAirline(r)}</td>` +
         `${hasG ? `<td class="rg">${this._esc(gate)}</td>` : ""}<td class="rs ${st.cls}">${sInner}</td></tr>`;
     }).join("");
     return `<table>${head}${body}</table>`;
@@ -1724,7 +1751,10 @@ const FBC_LABELS = {
   show_airport_selector: "Show airport search on the card",
   show_airline_selector: "Show airline dropdown on the card", allow_add_airlines: "Let people add airlines from the card",
   show_window_selector: "Show time window dropdown on the card", show_flight_tracker: "Show the flight tracker (dropdown and field) on the card", show_gate: "Show gate and terminal for tracked flights (needs the companion script)", flight_popup: "Click a flight to see its details pop-up",
-  track_via_integration: "Follow flights that are not on the board through Flightradar24", time_window: "Start time window (hours ahead, 0 = any time)", city_codes: "Raleigh style: show airport codes (ATL) instead of city names when they do not fit",
+  track_via_integration: "Follow flights that are not on the board through Flightradar24", time_window: "Start time window (hours ahead, 0 = any time)", sort: "Order of the flights: by time, or A-Z by city like a real board",
+  header_image: "Raleigh style: picture behind the DEPARTURES and ARRIVALS banner (for example /local/logos/flightboard/header.jpg)",
+  compact_time: "Raleigh style: show times as 01:45PM",
+  city_codes: "Raleigh style: show airport codes (ATL) instead of city names when they do not fit",
   show_rows_selector: "Show the rows dropdown on the card (rows and time window adjust to each other)", max_rows: "Most rows shown in auto mode", hide_private: "Hide private and charter flights",
   flip_cycle: "Split-flap: letters cycle before settling", flip_on_load: "Split-flap: spin in when the board loads",
   flip_step_ms: "Split-flap: milliseconds per flip", flip_max_steps: "Split-flap: most flips per character", title: "Title (leave empty for the airport name)",
@@ -1739,6 +1769,9 @@ const FBC_SCHEMA = [
   { name: "font_size", selector: { number: { min: 12, max: 40, step: 1, mode: "slider" } } },
   { name: "rows", selector: { number: { min: 3, max: 30, step: 1, mode: "slider" } } },
   { type: "grid", name: "", schema: [
+    { name: "sort", selector: { select: { mode: "dropdown", options: [{ value: "time", label: "By time" }, { value: "city", label: "A-Z by city" }] } } },
+    { name: "header_image", selector: { text: {} } },
+    { name: "compact_time", selector: { boolean: {} } },
     { name: "city_codes", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Raleigh: airport code when the city does not fit (auto)" }, { value: "always", label: "Raleigh: always airport codes" }, { value: "never", label: "Raleigh: always city names" }] } } },
     { name: "layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Side by side (auto)" }, { value: "stacked", label: "Stacked" }] } } },
     { name: "past_minutes", selector: { number: { min: 0, max: 120, step: 5, mode: "box" } } },

@@ -401,6 +401,10 @@ tr[data-rk] { cursor:pointer; }
 .board.raleigh td.rs.ok { color:#1f9d55; } .board.raleigh td.rs.warn, .board.raleigh td.rs.bad { color:#e8741a; } .board.raleigh td.rs.board { color:#1f9d55; }
 .board.raleigh tr.trkd td { box-shadow:inset 0 0 0 9999px rgba(255,196,0,.28); }
 .board.raleigh .g, .board.raleigh .hg { }
+/* Raleigh: the pop-up card is white, so its text must be dark (the style's own text colour is white) */
+.board.raleigh .pcard { color:#101b33; --sub:#5d6a80; --th:#56627a; --line:#cfd6e2; }
+.board.raleigh .pcard .ptitle, .board.raleigh .pcard .proute .pa b, .board.raleigh .pcard .pgrid b { color:#101b33; }
+.board.raleigh .pclose { color:#56627a; }
 
 .board.led { --bg:#050505; --fg:#ffb000; --font:"Courier New","DejaVu Sans Mono",monospace;
   --title:#ffb000; --accent:#ff7a00; --clock:#ff3b1f; --panel:#000; --hbg:#000; --hfg:#ffb000; --th:#8a5a00; --line:#2a1a00; --line2:transparent;

@@ -1456,11 +1456,15 @@ th .sorth.on { color:var(--fg); }
     if (chips) chips.innerHTML = all.map(o => `<span class="trkchip">${this._esc(o.code)}${o.extra ? `<span class="trkx" data-rm="${this._esc(o.code)}" title="Stop tracking">&times;</span>` : ""}</span>`).join("");
     if (!all.length || !this._hass) {
       // On a tracked-only card an empty panel would look broken: say what to do
-      trk.innerHTML = this._config.show === "tracked" && this._hass ? `<div class="trknf"><b>No flights tracked.</b>Track a flight on the board card (same browser), or list them under <code>tracked_flights</code> in this card's YAML.</div>` : "";
+      // Minimal tracked-only card: nothing tracked means nothing to show, so the card hides itself
+      const mini = this._config.show === "tracked" && this._config.tracked_controls !== true;
+      this.style.display = mini ? "none" : "";
+      trk.innerHTML = this._config.show === "tracked" && !mini && this._hass ? `<div class="trknf"><b>No flights tracked.</b>Track a flight on the board card (same browser), or list them under <code>tracked_flights</code> in this card's YAML.</div>` : "";
       trk.className = this._config.show === "tracked" ? "trk trkcols one" : "trk";
       if (this._gateTiles) { this._gateTiles = 0; this._fit(); }
       return;
     }
+    this.style.display = "";
     const dep = this._trackRows(this._config.departures_entity, "dep");
     const arr = this._trackRows(this._config.arrivals_entity, "arr");
     // Flights that are not on the airport board come from the integration's additional tracked sensor
@@ -1477,7 +1481,10 @@ th .sorth.on { color:var(--fg); }
     if (arr.length) h += `<div class="panel"><div class="ph">${this._icon("arr")}Tracking - arrival</div>${this._table(arr, "arr", "trk")}</div>`;
     const found = dep.concat(arr);
     const ap = this._ap().iata || this._ap().icao || "this";
-    for (const o of all) {
+    const miniCard = this._config.show === "tracked" && this._config.tracked_controls !== true;
+    // The minimal card hides itself when none of the tracked flights can be shown
+    if (miniCard && !found.length) { this.style.display = "none"; trk.innerHTML = ""; return; }
+    for (const o of miniCard ? [] : all) {
       if (!found.some(r => r.keys.indexOf(o.code) >= 0)) {
         h += `<div class="trknf"><b>${this._esc(o.code)}</b>was not found. It is not on the ${this._esc(ap)} board, and Flightradar24 has no live or scheduled flight with that number to follow.</div>`;
       }

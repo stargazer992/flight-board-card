@@ -5,7 +5,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/stargazer992/flight-board-card/actions/workflows/validate.yml/badge.svg)](https://github.com/stargazer992/flight-board-card/actions/workflows/validate.yml)
 
-An airport **departures and arrivals board** for your Home Assistant dashboard. It is built for wall panels and tablets: large, readable text, live status and six classic board styles, including a split-flap board with flipping letters.
+An airport **departures and arrivals board** for your Home Assistant dashboard. It is built for wall panels and tablets: large, readable text, live status and seven classic board styles, including a split-flap board with flipping letters.
 
 It shows the flights from the [Flightradar24 integration](https://github.com/AlexandrErohin/home-assistant-flightradar24). No Flightradar24 subscription is needed.
 
@@ -21,7 +21,7 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
   - **Flight pop-up**: click any flight on the board for its details: aircraft, scheduled, estimated and actual times, gate, terminal and baggage belt, live position, altitude, speed, distance to the destination and a countdown to landing (gate and position need the companion script)
   - **Gate column** in the tracking panels
   - **Split-flap flipping**: letters and numbers scroll through the drum before settling on the right character, like a real board
-- Six board styles, selectable from a menu on the card itself:
+- Seven board styles, selectable from a menu on the card itself:
   - **Classic**: black and yellow
   - **Split-flap**: every letter on its own flap, letters flip when something changes
   - **Digital flaps**: modern flap-look panels
@@ -43,8 +43,8 @@ It shows the flights from the [Flightradar24 integration](https://github.com/Ale
 | ![Classic](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/classic.png) | ![Digital flaps](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/digital.png) |
 | **Amsterdam style** | **London style** |
 | ![Amsterdam style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/amsterdam.png) | ![London style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/london.png) |
-| **LED dot-matrix** | |
-| ![LED dot-matrix](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/led.png) | |
+| **LED dot-matrix** | **Raleigh style** |
+| ![LED dot-matrix](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/led.png) | ![Raleigh style](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/raleigh.png) |
 
 ## Requirements
 
@@ -106,9 +106,9 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 
 | Option | Default | Description |
 |---|---|---|
-| `theme` | `classic` | Starting style: `classic`, `splitflap`, `digital`, `amsterdam`, `london`, `led`. A style picked in the menu on the card overrides this on that device. |
+| `theme` | `classic` | Starting style: `classic`, `splitflap`, `digital`, `amsterdam`, `london`, `raleigh`, `led`. A style picked in the menu on the card overrides this on that device. |
 | `time_format` | `24h` | `24h` (18:30) or `12h` (6:30 PM) |
-| `rows` | `12` | Number of flights shown in each list |
+| `rows` | `12` | Number of flights shown in each list. Picking a time window on the card shows every flight in it (see `max_rows`) |
 | `font_size` | `22` | Base text size in pixels |
 | `show` | `both` | `both`, `departures` or `arrivals` |
 | `layout` | `auto` | `auto` (side by side on wide screens) or `stacked` |
@@ -197,6 +197,24 @@ tracked_flights:
 
 The flight is found on the board when it is in the data for the airport the board is showing. The Flightradar24 integration lists a limited number of flights to and from that airport, a few hours either side of now. A flight that is not there shows "is not on the board right now". If a flight number is used for both an arrival and a departure at the airport, both are shown.
 
+### Raleigh style and airline logos (fork)
+
+![Raleigh style with sample data](https://raw.githubusercontent.com/stargazer992/flight-board-card/main/images/raleigh.png)
+
+The Raleigh style follows the boards at Raleigh-Durham: a blue banner, white rows, and City / Time, Airline / Flight, Gate and Status columns. Without logos it shows the airline name, as above. To show logos, add your own images (airline logos are trademarks, so none are bundled): put them in `/config/www/logos/` (about 60 px tall, transparent PNG or SVG) and map them by airline code:
+
+```yaml
+type: custom:flight-board-card
+theme: raleigh
+airline_logos:
+  AA: /local/logos/aa.png
+  DL: /local/logos/dl.png
+  MX: /local/logos/breeze.png
+  MXY: /local/logos/breeze.png
+```
+
+A logo is matched by the airline's IATA code, ICAO code or the letters at the start of the flight number, in any letter case.
+
 ### Airline filter (fork)
 
 ```yaml
@@ -210,7 +228,7 @@ airlines:
     name: Southwest
 ```
 
-The time window hides flights scheduled later than the chosen number of hours from now. The `rows` limit still applies, so raise `rows` if a long window should list more flights.
+The time window hides flights scheduled later than the chosen number of hours from now. The rows grow to fit the window (up to `max_rows`), and the Rows dropdown lets you pick a fixed number instead; asking for more rows than the window holds widens the window.
 
 American Eagle, Delta Connection and United Express report their mainline code, so they appear under AA, DL and UA. With a single airline selected you may see fewer rows than `rows`, because only that airline's flights are listed. The selection is stored per device (browser localStorage).
 

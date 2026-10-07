@@ -1792,7 +1792,11 @@ th .sorth.on { color:var(--fg); }
   _arrRow(r, kind) {
     const lv = this._liveByKeys(r.idk || r.keys), sc = this._schedByKeys(r.idk || r.keys), raw = r.raw || {};
     const pick = k => { for (const src of [lv, sc, raw]) { const v = this._num(src && src[k]); if (v > 0) return v; } return 0; };
-    const sa = pick("time_scheduled_arrival"), ea = pick("time_estimated_arrival"), ra = pick("time_real_arrival"), rd = pick("time_real_departure");
+    const sa = pick("time_scheduled_arrival"), ra = pick("time_real_arrival"), rd = pick("time_real_departure");
+    let ea = pick("time_estimated_arrival");
+    // No estimated arrival yet: carry a late departure over to the arrival
+    const sdp = pick("time_scheduled_departure"), edp = pick("time_estimated_departure");
+    if (!ea && sa && sdp && edp && edp > sdp) ea = sa + (edp - sdp);
     const to = this._ends(r, kind).to, tz = this._tzOf(to.k) || null;
     const ts = ra || ea || sa;
     if (!ts) return {};   // no arrival time known: keep the board's own time and status
@@ -1804,6 +1808,9 @@ th .sorth.on { color:var(--fg); }
     else if (air || rd) st = "ETA " + fm(ea || sa);
     else if (ea && sa && ea !== sa) st = "EXPECTED " + fm(ea);
     else st = "SCHEDULED";
+    // Arriving on another day (destination time): show the date instead of a time-only status
+    const tag = !ra && !(lv && lv.has_landed) && cls !== "warn" && !air && !rd ? this._dayTag(ts, tz || undefined) : "";
+    if (tag) { st = "SCHED " + tag; cls = ""; }
     return { t: fm(ts), s: st, cls };
   }
   _table(rows, kind, pfx) {
@@ -1813,8 +1820,8 @@ th .sorth.on { color:var(--fg); }
     const flap = this._theme === "splitflap", n = this._tiles4();
     // Gate column: only in the tracker panels, and only when a tracked flight has gate or terminal data
     const hasG = pfx === "trk" && this._gateTiles > 0;
-    // Tracked-only card: separate From and To columns instead of the single Destination / From column
-    const ft = pfx === "trk" && this._config.show === "tracked";
+    // Tracking panel (full board and tracked-only card): separate From and To columns, with the arrival time and status
+    const ft = pfx === "trk";
     // London style: gate (departures) or baggage belt (arrivals) for every flight, when the gate sensor knows any
     const lon = this._theme === "london";
     const bg = !pfx && lon && rows.some(r => this._boardGate(r));

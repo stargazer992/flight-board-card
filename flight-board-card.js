@@ -1801,16 +1801,20 @@ th .sorth.on { color:var(--fg); }
     const ts = ra || ea || sa;
     if (!ts) return {};   // no arrival time known: keep the board's own time and status
     const fm = x => this._fmt(x, tz);
-    const air = !!(lv && lv.on_ground !== undefined && lv.on_ground !== null && Number(lv.on_ground) === 0);
+    // The time column already shows the arrival time, so the status is just a word: ON TIME, DELAYED, EARLY, LANDED, DIVERTED, CANCELLED
+    const str = k => { for (const src of [lv, sc, raw]) if (src && src[k]) return String(src[k]); return ""; };
+    const stx = (str("status") + " " + str("status_text")).toLowerCase();
+    const landed = !!ra || !!(lv && lv.has_landed) || /landed/.test(stx);
     let st, cls = "";
-    if (ra || (lv && lv.has_landed)) { st = ra ? "LANDED " + fm(ra) : "LANDED"; cls = "ok"; }
-    else if (ea && sa && ea - sa >= 900) { st = "DELAYED " + fm(ea); cls = "warn"; }
-    else if (air || rd) st = "ETA " + fm(ea || sa);
-    else if (ea && sa && ea !== sa) st = "EXPECTED " + fm(ea);
-    else st = "SCHEDULED";
-    // Arriving on another day (destination time): show the date instead of a time-only status
-    const tag = !ra && !(lv && lv.has_landed) && cls !== "warn" && !air && !rd ? this._dayTag(ts, tz || undefined) : "";
-    if (tag) { st = "SCHED " + tag; cls = ""; }
+    if (/cancel/.test(stx)) { st = "CANCELLED"; cls = "bad"; }
+    else if (/divert/.test(stx)) { st = "DIVERTED"; cls = "bad"; }
+    else if (landed) { st = "LANDED"; cls = "ok"; }
+    else if (ea && sa && ea - sa >= 900) { st = "DELAYED"; cls = "warn"; }
+    else if (ea && sa && sa - ea >= 600) { st = "EARLY"; cls = "ok"; }
+    else st = "ON TIME";
+    // Arriving on another day (destination time): add the date
+    const tag = !landed && cls !== "bad" ? this._dayTag(ts, tz || undefined) : "";
+    if (tag) st += " " + tag;
     return { t: fm(ts), s: st, cls };
   }
   _table(rows, kind, pfx) {

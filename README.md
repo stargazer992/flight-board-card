@@ -135,6 +135,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `show_gate` | `true` | Show a Gate column (gate, terminal, baggage belt) in the tracking panels. Needs the companion script |
 | `flight_popup` | `true` | Click any flight on the board to open a details pop-up (times, gate, baggage belt, position, altitude, time to landing) |
 | `gates_entity` | `sensor.flight_board_gates` | London style only: sensor with the gate (departures) and baggage belt (arrivals) of every flight on the board. Published by the companion script |
+| `track_remove_after_hours` | `2` | Stop tracking a flight this many hours after it lands (removed from this device's tracked list; flights in `tracked_flights` are only hidden). `0` = never |
 | `tracked_controls` | `false` | With `show: tracked`: also show the title, clock, style menu and Track flight box. Off = only the column titles and flight rows |
 | `time_zone_mode` | `airport` | Pop-up times: `airport` = departure in the origin's local time and arrival in the destination's (with CDT/PDT etc.); `board` = everything in the board airport's time. The **Times** button in the pop-up switches it and is remembered per device |
 | `full_board_entity` | `sensor.flight_board_full` | Longer list of flights from the companion script, merged into the board so long time windows and airline filters show all flights. Empty = off |

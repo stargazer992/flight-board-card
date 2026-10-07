@@ -296,6 +296,10 @@ tr:nth-child(even) td { background:var(--zebra); }
 .c { width:34%; font-weight:700; text-transform:var(--cityCase); color:var(--city); }
 .f { width:16%; color:var(--flight); }
 .g { width:10%; color:var(--flight); font-weight:700; }
+table.ft .x { width:4%; text-align:center; }
+.board.splitflap .x { width:var(--wx); }
+.rmx { color:#777; cursor:pointer; font-size:1.3em; padding:0 6px; line-height:1; }
+.rmx:hover { color:#ff6b6b; }
 table.ft .t { width:11%; } table.ft .c { width:12%; } table.ft .f { width:13%; } table.ft .g { width:10%; } table.ft .s { width:40%; }
 .hg .t { width:12%; } .hg .c { width:27%; } .hg .f { width:14%; } .hg .g { width:14%; } .hg .s { width:33%; }
 .h12 .hg .t { width:15%; } .h12 .hg .c { width:24%; }
@@ -756,6 +760,9 @@ th .sorth.on { color:var(--fg); }
       });
     }
     this.shadowRoot.addEventListener("click", (e) => {
+      // Small x on a tracking row: stop tracking that flight
+      const rx = e.target && e.target.closest ? e.target.closest(".rmx") : null;
+      if (rx) { e.stopPropagation(); for (const c of String(rx.dataset.rm || "").split(",")) if (c) this._removeTrack(c); return; }
       if (this._config.flight_popup === false) return;
       const tr = e.target && e.target.closest ? e.target.closest("tr[data-rk]") : null;
       if (tr) this._openPopup(tr.dataset.rk);
@@ -1473,6 +1480,44 @@ th .sorth.on { color:var(--fg); }
     return st.attributes.flights.filter(f => f && f[key] && this._flightKeys(f).some(k => codes.indexOf(k) >= 0))
       .sort((x, y) => x[key] - y[key]).map(f => this._rowOf(f, kind));
   }
+  // Has this tracking row landed, and when (seconds; 0 = landed but time unknown)
+  _landInfo(r) {
+    const lv = this._liveByKeys(r.idk || r.keys), sc = this._schedByKeys(r.idk || r.keys), raw = r.raw || {};
+    let ra = 0;
+    for (const src of [lv, sc, raw]) { const v = this._num(src && src.time_real_arrival); if (v > 0) { ra = v; break; } }
+    let sa = 0;
+    for (const src of [lv, sc, raw]) { const v = this._num(src && src.time_scheduled_arrival); if (v > 0) { sa = v; break; } }
+    const landed = ra > 0 || !!(lv && lv.has_landed) || /^LANDED/i.test(String(r.s || ""));
+    return { landed, ra, sa };
+  }
+  // Drop rows (and flights tracked on this device) that landed more than track_remove_after_hours ago (default 2, 0 = never)
+  _expireTracked(all, dep, arr) {
+    const hrs = this._config.track_remove_after_hours === undefined ? 2 : Number(this._config.track_remove_after_hours);
+    if (!(hrs > 0)) return { dep, arr, removed: false, codes: [] };
+    const nowS = Date.now() / 1000, lk = "flight-board-card-landed";
+    let seen = {};
+    try { seen = JSON.parse(localStorage.getItem(lk) || "{}") || {}; } catch (e) { seen = {}; }
+    let dirty = false;
+    const expired = r => {
+      const li = this._landInfo(r), key = (r.keys && r.keys[0] || r.fl) + "|" + li.sa;
+      if (!li.landed) { if (seen[key] !== undefined) { delete seen[key]; dirty = true; } return false; }
+      let t0 = li.ra;
+      if (!t0) { if (seen[key] === undefined) { seen[key] = nowS; dirty = true; } t0 = seen[key]; }
+      return nowS - t0 > hrs * 3600;
+    };
+    const gone = [];
+    const keep = rows => rows.filter(r => { if (expired(r)) { gone.push(r); return false; } return true; });
+    const d2 = keep(dep), a2 = keep(arr);
+    for (const k in seen) if (nowS - seen[k] > 3 * 86400) { delete seen[k]; dirty = true; }
+    if (dirty) { try { localStorage.setItem(lk, JSON.stringify(seen)); } catch (e) {} }
+    let removed = false;
+    const codes = [];
+    for (const r of gone) for (const o of all) if ((r.keys || []).indexOf(o.code) >= 0) {
+      codes.push(o.code);
+      if (o.extra) { this._removeTrack(o.code); removed = true; }
+    }
+    return { dep: d2, arr: a2, removed, codes };
+  }
   // Pinned panel(s) above the board for tracked flights. Ignores the airline, window and private filters.
   _renderTrack() {
     const root = this.shadowRoot;
@@ -1492,10 +1537,14 @@ th .sorth.on { color:var(--fg); }
       return;
     }
     this.style.display = "";
-    const dep = this._trackRows(this._config.departures_entity, "dep");
-    const arr = this._trackRows(this._config.arrivals_entity, "arr");
+    let dep = this._trackRows(this._config.departures_entity, "dep");
+    let arr = this._trackRows(this._config.arrivals_entity, "arr");
     // Flights that are not on the airport board come from the integration's additional tracked sensor
     this._trackLive(all, dep.concat(arr), dep, arr);
+    // Automatic clean-up some hours after landing
+    const ex = this._expireTracked(all, dep, arr);
+    if (ex.removed) return;   // removing a flight re-renders the panel
+    dep = ex.dep; arr = ex.arr;
     // Ask the companion script for gate and live data of every tracked flight (throttled), then decide on the Gate column
     if (this._config.show_gate !== false) for (const o of all) this._requestLookup(o.code);
     const gt = this._config.show_gate !== false && dep.concat(arr).some(r => { const g = this._gateOf(r); return !!(g.g || g.term); }) ? 4 : 0;
@@ -1512,7 +1561,7 @@ th .sorth.on { color:var(--fg); }
     // The minimal card hides itself when none of the tracked flights can be shown
     if (miniCard && !found.length) { this.style.display = "none"; trk.innerHTML = ""; return; }
     for (const o of miniCard ? [] : all) {
-      if (!found.some(r => r.keys.indexOf(o.code) >= 0)) {
+      if (ex.codes.indexOf(o.code) < 0 && !found.some(r => r.keys.indexOf(o.code) >= 0)) {
         h += `<div class="trknf"><b>${this._esc(o.code)}</b>was not found. It is not on the ${this._esc(ap)} board, and Flightradar24 has no live or scheduled flight with that number to follow.</div>`;
       }
     }
@@ -1830,17 +1879,20 @@ th .sorth.on { color:var(--fg); }
     const hasG = pfx === "trk" && this._gateTiles > 0;
     // Tracking panel (full board and tracked-only card): separate From and To columns, with the arrival time and status
     const ft = pfx === "trk";
+    // Small x at the end of each row of a flight tracked on this device (flights set in the YAML have none)
+    const rmOf = r => ft ? this._trackedAll().filter(o => o.extra && (r.keys || []).indexOf(o.code) >= 0).map(o => o.code).join(",") : "";
+    const hasX = ft && rows.some(r => rmOf(r));
     // London style: gate (departures) or baggage belt (arrivals) for every flight, when the gate sensor knows any
     const lon = this._theme === "london";
     const bg = !pfx && lon && rows.some(r => this._boardGate(r));
     // Column titles are buttons that sort the board (not in the tracking panel)
     const sh = (k, label) => pfx === "trk" ? label :
       `<span class="sorth${this._sortKey === k ? " on" : ""}" data-sk="${k}" title="Sort by ${label.toLowerCase()}">${label}${this._sortKey === k ? (this._sortDir === -1 ? " &#9660;" : " &#9650;") : ""}</span>`;
-    const head = `<tr><th class="t">${sh("time", "Time")}</th>${ft ? `<th class="c">From</th><th class="c">To</th>` : `<th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th>`}<th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th></tr>`;
+    const head = `<tr><th class="t">${sh("time", "Time")}</th>${ft ? `<th class="c">From</th><th class="c">To</th>` : `<th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th>`}<th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th>${hasX ? '<th class="x"></th>' : ""}</tr>`;
     let tstyle = "";
     if ((hasG || ft) && flap) {
-      const gt = hasG ? this._gateTiles : 0, tot = n.t + (ft ? 8 : n.c) + n.f + n.s + gt;
-      tstyle = ` style="--wt:${(100 * n.t / tot).toFixed(2)}%;--wc:${(100 * (ft ? 4 : n.c) / tot).toFixed(2)}%;--wf:${(100 * n.f / tot).toFixed(2)}%;--ws:${(100 * n.s / tot).toFixed(2)}%;--wg:${(100 * gt / tot).toFixed(2)}%"`;
+      const gt = hasG ? this._gateTiles : 0, xt = hasX ? 1.5 : 0, tot = n.t + (ft ? 8 : n.c) + n.f + n.s + gt + xt;
+      tstyle = ` style="--wt:${(100 * n.t / tot).toFixed(2)}%;--wc:${(100 * (ft ? 4 : n.c) / tot).toFixed(2)}%;--wf:${(100 * n.f / tot).toFixed(2)}%;--ws:${(100 * n.s / tot).toFixed(2)}%;--wg:${(100 * gt / tot).toFixed(2)}%;--wx:${(100 * xt / tot).toFixed(2)}%"`;
     }
     const body = rows.map((r0, i) => {
       const r = ft ? Object.assign({}, r0, this._arrRow(r0, kind)) : r0;
@@ -1849,7 +1901,7 @@ th .sorth.on { color:var(--fg); }
       if (flap) {
         const k = (pfx || "") + kind + i;
         return `<tr${this._trkClass(r)}${rk}><td class="t">${this._tiles(this._compact(r.t).padStart(n.t, " "), n.t, k + "t")}</td>${ft ? (e => `<td class="c">${this._tiles(e.from.k || e.from.c, 4, k + "c")}</td><td class="c">${this._tiles(e.to.k || e.to.c, 4, k + "d")}</td>`)(this._ends(r, kind)) : `<td class="c">${this._tiles(r.c, n.c, k + "c")}</td>`}` +
-          `<td class="f">${this._tiles(r.fl, n.f, k + "f")}</td>${gi ? `<td class="g">${this._tiles(gi.flap, this._gateTiles, k + "g")}</td>` : ""}<td class="s ${r.cls}">${this._tiles(this._flapStatus(r.s, n.s), n.s, k + "s")}</td></tr>`;
+          `<td class="f">${this._tiles(r.fl, n.f, k + "f")}</td>${gi ? `<td class="g">${this._tiles(gi.flap, this._gateTiles, k + "g")}</td>` : ""}<td class="s ${r.cls}">${this._tiles(this._flapStatus(r.s, n.s), n.s, k + "s")}</td>${hasX ? `<td class="x">${rmOf(r) ? `<span class="rmx" data-rm="${this._esc(rmOf(r))}" title="Stop tracking">&times;</span>` : ""}</td>` : ""}</tr>`;
       }
       const pk = (pfx || "") + kind + r.id;
       const prev = this._prev[pk], changed = prev !== undefined && prev !== r.s;
@@ -1860,7 +1912,7 @@ th .sorth.on { color:var(--fg); }
       const inner = `<div class="st"><span class="sw" data-short="${this._esc(swShort)}">${this._esc(sw)}</span>${stt ? `<span class="stt">${this._esc(stt)}</span>` : ""}</div>`;
       const sCell = changed ? `<div class="flip">${inner}</div>` : inner;
       return `<tr${this._trkClass(r)}${rk}><td class="t">${this._esc(r.t)}</td>${ft ? (e => `<td class="c">${this._esc(e.from.k || e.from.c)}</td><td class="c">${this._esc(e.to.k || e.to.c)}</td>`)(this._ends(r, kind)) : `<td class="c">${this._esc(r.c)} <span class="sub">${this._esc(r.code)}</span></td>`}` +
-        `<td class="f">${this._esc(r.fl)}<span class="sub">${this._esc(r.al)}</span></td>${gi ? `<td class="g">${this._esc(gi.g || "-")}<span class="sub">${this._esc(gi.sub)}</span></td>` : bg ? `<td class="g">${this._esc(this._boardGate(r))}</td>` : ""}<td class="s ${r.cls}">${sCell}</td></tr>`;
+        `<td class="f">${this._esc(r.fl)}<span class="sub">${this._esc(r.al)}</span></td>${gi ? `<td class="g">${this._esc(gi.g || "-")}<span class="sub">${this._esc(gi.sub)}</span></td>` : bg ? `<td class="g">${this._esc(this._boardGate(r))}</td>` : ""}<td class="s ${r.cls}">${sCell}</td>${hasX ? `<td class="x">${rmOf(r) ? `<span class="rmx" data-rm="${this._esc(rmOf(r))}" title="Stop tracking">&times;</span>` : ""}</td>` : ""}</tr>`;
     }).join("");
     return `<table${ft ? ' class="ft' + (hasG ? " hg" : "") + '"' : hasG || bg ? ' class="hg"' : ""}${tstyle}>${head}${body}</table>`;
   }
@@ -1994,7 +2046,7 @@ th .sorth.on { color:var(--fg); }
 
 const FBC_LABELS = {
   theme: "Start style", time_format: "Time format", time_zone_mode: "Pop-up time zone", font_size: "Text size (px)", rows: "Rows per list",
-  show: "Show", tracked_controls: "Tracked-only card: also show the title, clock and Track flight box", layout: "Layout", past_minutes: "Hide departed/landed flights after (minutes)",
+  show: "Show", track_remove_after_hours: "Stop tracking a flight this many hours after it lands (0 = never)", tracked_controls: "Tracked-only card: also show the title, clock and Track flight box", layout: "Layout", past_minutes: "Hide departed/landed flights after (minutes)",
   show_airline: "Show airline and airport code", show_selector: "Show style menu on the card",
   show_airport_selector: "Show airport search on the card",
   show_airline_selector: "Show airline dropdown on the card", allow_add_airlines: "Let people add airlines from the card",

@@ -269,16 +269,16 @@ tr[data-rk] { cursor:pointer; }
 .pgrid { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px 14px; }
 .pgrid div { min-width:0; } .pgrid span { display:block; color:var(--sub); font-size:12px; } .pgrid b { font-size:17px; font-weight:700; }
 .pbig b { font-size:22px; }
-.gsigns { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px; margin:14px 0 4px; }
+.gsigns { margin:12px 0 2px; max-width:270px; }
 .gcap { color:var(--sub); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
-.gsign { background:#fcc419; color:#111; border:3px solid #111; border-radius:6px; padding:8px 12px 9px; box-shadow:0 2px 8px rgba(0,0,0,.45); font-family:"Helvetica Neue",Arial,sans-serif; }
-.gs-main { display:flex; align-items:center; gap:12px; }
+.gsign { background:#fcc419; color:#111; border:2.5px solid #111; border-radius:6px; padding:6px 10px 7px; box-shadow:0 2px 8px rgba(0,0,0,.45); font-family:"Helvetica Neue",Arial,sans-serif; }
+.gs-main { display:flex; align-items:center; gap:10px; }
 .gs-lab { display:flex; flex-direction:column; align-items:center; gap:3px; }
-.gs-ic { width:42px; height:42px; border:2.5px solid #111; padding:5px; box-sizing:border-box; }
+.gs-ic { width:32px; height:32px; border:2px solid #111; padding:4px; box-sizing:border-box; }
 .gs-ic svg { width:100%; height:100%; fill:#111; display:block; }
-.gs-l { font-size:15px; font-weight:800; line-height:1; }
-.gs-g { font-size:56px; font-weight:900; line-height:1; letter-spacing:1px; flex:1; text-align:center; }
-.gs-sub { margin-top:6px; padding-top:5px; border-top:2px solid #111; font-size:15px; font-weight:800; letter-spacing:1px; text-transform:uppercase; display:flex; justify-content:space-between; gap:10px; }
+.gs-l { font-size:12px; font-weight:800; line-height:1; }
+.gs-g { font-size:42px; font-weight:900; line-height:1; letter-spacing:1px; flex:1; text-align:center; }
+.gs-sub { margin-top:4px; padding-top:3px; border-top:2px solid #111; font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; display:flex; justify-content:space-between; gap:10px; }
 .pnote { color:var(--sub); font-size:13px; margin-top:12px; line-height:1.4; }
 .s { width:37%; font-weight:700; color:var(--st); }
 .s.ok { color:var(--ok); } .s.warn { color:var(--warn); } .s.bad { color:var(--bad); } .s.board { color:var(--brd); }
@@ -728,7 +728,8 @@ tr[data-rk] { cursor:pointer; }
     const cls = r.cls === "ok" || r.cls === "warn" || r.cls === "bad" ? " " + r.cls : "";
     let h = `<div class="pcard"><button class="pclose" type="button" title="Close">&times;</button>`;
     h += `<div class="ptitle">${E(title)}</div><div class="psub">${E(airline)}${model ? " - " + E(model) : ""}${reg2 ? " - " + E(reg2) : ""}</div>`;
-    const signs = sign("Departure gate", o.code, og, false, "dep") + sign("Arrival gate", d.code, dg, true, "arr");
+    // Only the gate that matters for this row: the arrival gate for an arrival, the departure gate for a departure
+    const signs = r.kind === "arr" ? sign("Arrival gate", d.code, dg, true, "arr") : sign("Departure gate", o.code, og, false, "dep");
     if (signs) h += `<div class="gsigns">${signs}</div>`;
     h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm">&#9992;</div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
     h += `<span class="pbadge${cls}">${E(r.s)}</span>${cd ? ` <span class="psub">${E(cd)}</span>` : ""}`;

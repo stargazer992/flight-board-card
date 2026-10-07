@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
-- Click any flight on the board to open a details pop-up: aircraft, scheduled, estimated and actual times, gate, terminal and baggage belt at both airports, live position, altitude, speed, heading, vertical rate, distance to the destination and a countdown to landing or departure. Gate and terminal sit at the top of the pop-up in yellow airport-sign blocks with black letters (departure and arrival side by side, with the baggage belt on the arrival sign). Options `flight_popup`, `lookup_service`.
+- Click any flight on the board to open a details pop-up: aircraft, scheduled, estimated and actual times, gate, terminal and baggage belt at both airports, live position, altitude, speed, heading, vertical rate, distance to the destination and a countdown to landing or departure. Gate and terminal sit at the top of the pop-up in a compact yellow airport-sign block with black letters: the arrival gate (with baggage belt) for an arrival, the departure gate for a departure. Options `flight_popup`, `lookup_service`.
 - Gate column (gate, terminal, belt) in the tracking panels. Option `show_gate`.
 - Companion script now also reads gate, terminal and belt from Flightradar24, adds live position from OpenSky Network (optional account, `OPENSKY_*` settings) and has a `pyscript.flight_board_lookup` service that the card calls when you open a pop-up. It now covers flights that are already airborne too. Gates come from Flightradar24's per-flight detail view, with an optional AeroDataBox key as a second source.
 

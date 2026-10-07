@@ -837,7 +837,7 @@ th .sorth.on { color:var(--fg); }
     } else if (sc && has(sc.os_latitude) && has(sc.os_longitude)) {
       pos = sd2(Number(sc.os_latitude), Number(sc.os_longitude), has(sc.os_altitude_m) ? Number(sc.os_altitude_m) * 3.28084 : null,
         has(sc.os_speed_ms) ? Number(sc.os_speed_ms) * 1.943844 : null, has(sc.os_heading) ? Number(sc.os_heading) : null,
-        has(sc.os_vertical_rate_ms) ? Number(sc.os_vertical_rate_ms) * 196.850394 : null, "OpenSky", this._num(sc.os_time), !!sc.os_on_ground);
+        has(sc.os_vertical_rate_ms) ? Number(sc.os_vertical_rate_ms) * 196.850394 : null, (sc.os_source ? String(sc.os_source) : "OpenSky"), this._num(sc.os_time), !!sc.os_on_ground);
     }
     // Countdown
     let cd = "";

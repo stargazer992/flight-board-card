@@ -39,12 +39,15 @@
 #     data and sends ONE notification per NOTIFY_COOLDOWN_SECONDS.
 #   - Gates are often empty until a few hours before departure; some airports
 #     never publish them. Empty values are simply not shown by the card.
-#   - OpenSky only knows aircraft that its receivers hear, so coverage varies.
+#   - OpenSky only knows aircraft that its receivers hear, so coverage varies. When it
+#     has no (fresh) position the script falls back to Flightradar24, Aviationstack and
+#     finally an estimate along the route (see POSITION_* below), so a flying aircraft always has one.
 #   - PyScript sensors are not saved across a full HA restart; the startup trigger
 #     rebuilds the sensor every time PyScript loads.
 #   - Only the Python standard library is used (urllib, json), no extra install.
 
 import json
+import math
 import time
 import urllib.error
 import urllib.parse
@@ -121,6 +124,16 @@ AVIATIONSTACK_URL = "https://api.aviationstack.com/v1/flights"
 AVS_CACHE_SECONDS = 3600
 AVS_MONTHLY_LIMIT = 90
 
+# POSITION FALLBACKS (so a flying aircraft always has a position)
+# Order: OpenSky -> Flightradar24 integration position -> Flightradar24 flight
+# track -> Aviationstack (only after a click) -> estimate along the route.
+# An OpenSky position older than POSITION_STALE_SECONDS counts as missing.
+# The estimate is a straight line between the two airports based on the times;
+# it is labelled "Estimated" on the card and has no altitude or speed.
+POSITION_STALE_SECONDS = 600
+POSITION_ESTIMATE = True
+TRAIL_CACHE_SECONDS = 120
+
 # A flight is looked up at most once per this many seconds
 CACHE_SECONDS = 900
 
@@ -167,6 +180,7 @@ SCHEDULE_STATE = {
     "os_cache": {},    # code -> {"at": ts, "data": dict or None}
     "adb_cache": {},   # code -> {"at": ts, "fields": dict}
     "avs_cache": {},   # code -> {"at": ts, "fields": dict}  (filled only by a card click)
+    "trail_cache": {}, # code -> {"at": ts, "data": dict or None}
     "avs_usage": {"month": "", "count": 0, "logged": False},
     "board_cache": {}, # "airport|mode" -> {"at": ts, "items": {flight number: [entries]}}
     "watch": {},       # code -> expiry timestamp (asked by the card)
@@ -550,7 +564,7 @@ def fb_sched_avs_merge(code, leg):
         return
     fields = entry["fields"]
     for key in fields:
-        if fields[key] and not leg.get(key):
+        if key != "_live" and fields[key] and not leg.get(key):
             leg[key] = fields[key]
 
 
@@ -608,6 +622,20 @@ def fb_sched_avs_lookup(code):
                 "airport_destination_terminal": fb_sched_clean(fb_sched_get(best, ["arrival", "terminal"])),
                 "airport_destination_baggage": fb_sched_clean(fb_sched_get(best, ["arrival", "baggage"])),
             }
+            # Live position, when the plan returns it (kept apart from the gate fields)
+            live = fb_sched_get(best, ["live"])
+            if isinstance(live, dict) and live.get("latitude") is not None and live.get("longitude") is not None:
+                try:
+                    fields["_live"] = {
+                        "os_latitude": float(live.get("latitude")),
+                        "os_longitude": float(live.get("longitude")),
+                        "os_heading": live.get("direction"),
+                        "os_on_ground": bool(live.get("is_ground")),
+                        "os_time": now,
+                        "os_source": "Aviationstack",
+                    }
+                except Exception:
+                    pass
         SCHEDULE_STATE["avs_cache"][code] = {"at": now, "fields": fields}
         log.info(f"{LOG_PREFIX}: Aviationstack {code}: {len(items)} result(s), request {usage['count']} this month, fields {fields}")
         return True
@@ -806,6 +834,156 @@ def fb_sched_codes():
     return codes, hints
 
 
+# ---------------------------- position fallbacks ------------------------------
+
+def fb_sched_pos_fresh(leg, now):
+    # True when the leg has a position newer than POSITION_STALE_SECONDS
+    if leg.get("os_latitude") is None or leg.get("os_longitude") is None:
+        return False
+    when = leg.get("os_time")
+    try:
+        return when is not None and now - float(when) < POSITION_STALE_SECONDS
+    except Exception:
+        return False
+
+
+def fb_sched_trail_position(code, leg):
+    # Latest point of the Flightradar24 flight track (detail view). Cached per flight.
+    # Returns a dict of os_* fields or None. Never raises.
+    now = time.time()
+    entry = SCHEDULE_STATE["trail_cache"].get(code)
+    if entry is not None and now - entry["at"] < TRAIL_CACHE_SECONDS:
+        return entry["data"]
+    data = None
+    flight_id = leg.get("flight_id")
+    if flight_id:
+        try:
+            payload = fb_sched_http_json(FR24_DETAIL_URL.replace("{flight_id}", str(flight_id)))
+            trail = fb_sched_get(payload, ["trail"])
+            if isinstance(trail, list) and len(trail) > 0:
+                # Newest point first; take the one with the highest timestamp to be safe
+                best = None
+                for pt in trail:
+                    if isinstance(pt, dict) and pt.get("lat") is not None and pt.get("lng") is not None:
+                        if best is None or (pt.get("ts") or 0) > (best.get("ts") or 0):
+                            best = pt
+                if best is not None:
+                    alt = best.get("alt")
+                    spd = best.get("spd")
+                    data = {
+                        "os_latitude": float(best.get("lat")),
+                        "os_longitude": float(best.get("lng")),
+                        "os_altitude_m": float(alt) * 0.3048 if alt is not None else None,
+                        "os_speed_ms": float(spd) * 0.514444 if spd is not None else None,
+                        "os_heading": best.get("hd"),
+                        "os_on_ground": bool(alt is not None and float(alt) <= 0),
+                        "os_time": best.get("ts") or now,
+                        "os_source": "Flightradar24 track",
+                    }
+        except Exception as e:
+            log.warning(f"{LOG_PREFIX}: Flightradar24 track for {code} failed: {e}")
+    SCHEDULE_STATE["trail_cache"][code] = {"at": now, "data": data}
+    return data
+
+
+def fb_sched_estimate_position(leg, now):
+    # Straight line between the airports, placed by elapsed time. Returns os_* fields or None.
+    try:
+        la1 = leg.get("airport_origin_latitude")
+        lo1 = leg.get("airport_origin_longitude")
+        la2 = leg.get("airport_destination_latitude")
+        lo2 = leg.get("airport_destination_longitude")
+        if la1 is None or lo1 is None or la2 is None or lo2 is None:
+            return None
+        t0 = leg.get("time_real_departure") or leg.get("time_estimated_departure") or leg.get("time_scheduled_departure")
+        t1 = leg.get("time_estimated_arrival") or leg.get("time_scheduled_arrival")
+        if not t0 or not t1 or t1 <= t0:
+            return None
+        frac = (now - t0) / float(t1 - t0)
+        if frac < 0:
+            frac = 0.0
+        if frac > 1:
+            frac = 1.0
+        p1 = math.radians(float(la1))
+        l1 = math.radians(float(lo1))
+        p2 = math.radians(float(la2))
+        l2 = math.radians(float(lo2))
+        d = 2 * math.asin(math.sqrt(math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin((l2 - l1) / 2) ** 2))
+        if d < 1e-9:
+            lat = float(la1)
+            lon = float(lo1)
+        else:
+            a = math.sin((1 - frac) * d) / math.sin(d)
+            b = math.sin(frac * d) / math.sin(d)
+            x = a * math.cos(p1) * math.cos(l1) + b * math.cos(p2) * math.cos(l2)
+            y = a * math.cos(p1) * math.sin(l1) + b * math.cos(p2) * math.sin(l2)
+            z = a * math.sin(p1) + b * math.sin(p2)
+            lat = math.degrees(math.atan2(z, math.sqrt(x * x + y * y)))
+            lon = math.degrees(math.atan2(y, x))
+        # Heading: from the estimated point toward the destination
+        pl = math.radians(lat)
+        ll = math.radians(lon)
+        hy = math.sin(l2 - ll) * math.cos(p2)
+        hx = math.cos(pl) * math.sin(p2) - math.sin(pl) * math.cos(p2) * math.cos(l2 - ll)
+        heading = (math.degrees(math.atan2(hy, hx)) + 360) % 360
+        return {
+            "os_latitude": round(lat, 4),
+            "os_longitude": round(lon, 4),
+            "os_heading": round(heading),
+            "os_on_ground": False,
+            "os_time": now,
+            "os_source": "Estimated",
+        }
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: position estimate failed: {e}")
+        return None
+
+
+def fb_sched_fallback_position(code, leg, hint):
+    # Fills the leg's position from the next source when OpenSky has none (or only an
+    # old one). Only for flights in the air. Never raises; the leg stays usable.
+    try:
+        now = time.time()
+        if fb_sched_pos_fresh(leg, now):
+            return
+        if not fb_sched_airborne(leg, hint):
+            return
+        stale = None
+        if leg.get("os_latitude") is not None:
+            stale = {}
+            for key in leg:
+                if key.startswith("os_"):
+                    stale[key] = leg[key]
+        # 1. Position the Flightradar24 integration already knows
+        got = None
+        if hint and hint.get("lat") is not None and hint.get("lon") is not None:
+            try:
+                got = {"os_latitude": float(hint["lat"]), "os_longitude": float(hint["lon"]), "os_on_ground": False,
+                       "os_time": now, "os_source": "Flightradar24"}
+            except Exception:
+                got = None
+        # 2. Flightradar24 flight track
+        if got is None:
+            got = fb_sched_trail_position(code, leg)
+        # 3. Aviationstack (filled only by a click)
+        if got is None:
+            entry = SCHEDULE_STATE["avs_cache"].get(code)
+            if entry is not None and entry["fields"].get("_live"):
+                got = entry["fields"]["_live"]
+        # 4. Old OpenSky position beats a guess
+        if got is None and stale is not None:
+            got = stale
+            got["os_source"] = "OpenSky (last known)"
+        # 5. Estimate along the route
+        if got is None and POSITION_ESTIMATE:
+            got = fb_sched_estimate_position(leg, now)
+        if got:
+            for key in got:
+                leg[key] = got[key]
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: position fallback for {code} failed: {e}")
+
+
 # =============================================================================
 # REBUILD
 # =============================================================================
@@ -931,6 +1109,9 @@ def fb_sched_rebuild():
                 for key in oentry["data"]:
                     leg[key] = oentry["data"][key]
                 leg["os_fetched_at"] = oentry["at"]
+                if not leg.get("os_source"):
+                    leg["os_source"] = "OpenSky"
+            fb_sched_fallback_position(code, leg, hints.get(code))
             out.append(leg)
         # Forget flights that are no longer wanted
         for key in list(cache.keys()):
@@ -948,7 +1129,7 @@ def fb_sched_rebuild():
                 "flights": out,
                 "icon": OUT_ICON,
                 "friendly_name": OUT_NAME,
-                "source": "flightradar24 flight list + opensky states",
+                "source": "flightradar24 flight list + opensky states + position fallbacks",
             },
         )
     except Exception as e:

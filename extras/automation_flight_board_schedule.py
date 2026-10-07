@@ -546,8 +546,15 @@ def fb_sched_publish_full():
                         rows.append(row)
                 except Exception as e:
                     log.warning(f"{LOG_PREFIX}: skipped a board flight: {e}")
-            rows.sort(key=lambda r: r.get(key) or 0)
-            out[mode] = rows[:FULL_BOARD_MAX]
+            # Sort by time without a lambda (PyScript lambdas cannot see local variables)
+            decorated = []
+            for idx in range(len(rows)):
+                decorated.append((rows[idx].get(key) or 0, idx))
+            decorated.sort()
+            ordered = []
+            for pair in decorated:
+                ordered.append(rows[pair[1]])
+            out[mode] = ordered[:FULL_BOARD_MAX]
         state.set(
             FULL_BOARD_SENSOR,
             value=len(out["departures"]) + len(out["arrivals"]),

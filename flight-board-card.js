@@ -293,6 +293,18 @@ th .sorth.on { color:var(--fg); }
 .board.narrow .apbox { flex:1 1 100%; }
 .board.narrow .apin { width:100%; box-sizing:border-box; }
 .board.narrow .clock { font-size:calc(var(--fs) + 2px); letter-spacing:1px; margin-left:auto; }
+.board.narrow .right { position:relative; }
+.board.narrow .apbox, .board.narrow .thbox, .board.narrow .albox, .board.narrow .wnbox, .board.narrow .rnbox, .board.narrow .trbox { position:static; }
+.board.narrow .apres, .board.narrow .thres, .board.narrow .alres, .board.narrow .wnres, .board.narrow .rnres, .board.narrow .trres { left:0; right:0; width:auto; }
+.board.narrow:not(.splitflap):not(.raleigh) td { font-size:calc(var(--fs) * .66); padding:8px 4px; }
+.board.narrow:not(.splitflap):not(.raleigh) td.s { white-space:normal; line-height:1.15; }
+.board.narrow .st { flex-direction:column; align-items:flex-start; gap:0; }
+.board.narrow .st .sw { overflow:visible; text-overflow:clip; white-space:nowrap; }
+.board.narrow:not(.splitflap):not(.raleigh) td small, .board.narrow:not(.splitflap):not(.raleigh) td .sub { font-size:calc(var(--fs) * .55); }
+.board.narrow:not(.splitflap):not(.raleigh) .t, .board.narrow.h12:not(.splitflap):not(.raleigh) .t { width:20%; }
+.board.narrow:not(.splitflap):not(.raleigh):not(.london) .c { width:27%; }
+.board.narrow:not(.splitflap):not(.raleigh):not(.london) .f { width:20%; }
+.board.narrow:not(.splitflap):not(.raleigh):not(.london) .s { width:33%; }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
 .pclose { position:absolute; top:8px; right:12px; background:none; border:0; color:var(--sub); font-size:28px; line-height:1; cursor:pointer; padding:4px 8px; }

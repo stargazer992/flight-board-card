@@ -55,7 +55,7 @@ const FBC_DEFAULTS = {
   theme: "classic", time_format: "24h", show: "both", layout: "auto", show_airline: true,
   show_selector: true, show_airport_selector: true,
   show_airline_selector: true, hide_private: true, airline: "",
-  allow_add_airlines: true, show_window_selector: true, time_window: 0, city_codes: "auto", sort: "time", header_image: "", compact_time: true, show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50], max_rows: 60,
+  allow_add_airlines: true, show_window_selector: true, time_window: 0, city_codes: "auto", sort: "time", header_image: "", compact_time: true, show_rows_selector: true, row_options: [6, 8, 10, 12, 16, 20, 30, 50, 100, 200], max_rows: 250,
   show_flight_tracker: true,
   // Flights that are not on the airport board are followed through the Flightradar24 "additional tracked" feature
   track_via_integration: true,
@@ -1139,14 +1139,14 @@ th .sorth.on { color:var(--fg); }
     return rows;
   }
   _rowOptions() {
-    const src = Array.isArray(this._config.row_options) && this._config.row_options.length ? this._config.row_options : [6, 8, 10, 12, 16, 20, 30, 50];
+    const src = Array.isArray(this._config.row_options) && this._config.row_options.length ? this._config.row_options : [6, 8, 10, 12, 16, 20, 30, 50, 100, 200];
     const out = [];
     for (const v of src) { const n = Math.floor(Number(v)); if (isFinite(n) && n > 0 && out.indexOf(n) < 0) out.push(n); }
     return out.sort((a, b) => a - b);
   }
   // Rows to show: the chosen number, or in auto mode enough for every flight in the window (capped by max_rows)
   _rowCap(win) {
-    const w = Number(win) || 0, mx = Math.max(1, Number(this._config.max_rows) || 60);
+    const w = Number(win) || 0, mx = Math.max(1, Number(this._config.max_rows) || 250);
     if (this._rowsAuto && w) return Math.min(mx, Math.max(this._rowsN, this._countIn(w)));
     return this._rowsN;
   }
@@ -1918,7 +1918,7 @@ const FBC_SCHEMA = [
   { name: "track_via_integration", selector: { boolean: {} } },
   { name: "time_window", selector: { number: { min: 0, max: 48, step: 1, mode: "box" } } },
   { name: "show_rows_selector", selector: { boolean: {} } },
-  { name: "max_rows", selector: { number: { min: 4, max: 200, step: 1, mode: "box" } } },
+  { name: "max_rows", selector: { number: { min: 4, max: 500, step: 1, mode: "box" } } },
   { name: "hide_private", selector: { boolean: {} } },
   { name: "flip_cycle", selector: { boolean: {} } },
   { name: "flip_on_load", selector: { boolean: {} } },

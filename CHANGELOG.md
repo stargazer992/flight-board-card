@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Auto rows now go up to 250 (was 60) so a long time window shows every flight; the Rows dropdown also offers 100 and 200.
 - Pop-up: the plane emoji between the airports is now a clean dashed arrow, and times show as tidy Scheduled / Actual (or Estimated) cells instead of one long line.
 - Time windows and airline filters now show every flight in the window: the companion script publishes a longer board (`sensor.flight_board_full`) and the card merges it in, because the integration only lists the next 50 flights. New option `full_board_entity`.
 - Removed the LED dot-matrix style (a saved `theme: led` now shows Digital flaps).

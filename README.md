@@ -126,8 +126,8 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `header_image` | (none) | Raleigh style: your own picture behind the DEPARTURES and ARRIVALS banner, for example `/local/logos/flightboard/header.jpg` (a wide image, about 1200 x 250 px, with the right side clear for the title) |
 | `compact_time` | `true` | Raleigh style: times as `01:45PM` like the airport boards (12-hour clock) |
 | `show_rows_selector` | `true` | Show the Rows dropdown on the card. Picking a time window grows the rows to fit every flight in it; picking more rows than the window holds widens the window |
-| `row_options` | 6, 8, 10, 12, 16, 20, 30, 50 | Row counts offered in the Rows dropdown |
-| `max_rows` | 60 | Most rows shown when the rows follow the time window |
+| `row_options` | 6, 8, 10, 12, 16, 20, 30, 50, 100, 200 | Row counts offered in the Rows dropdown |
+| `max_rows` | 250 | Most rows shown when the rows follow the time window |
 | `time_window` | `0` | Time window selected at start in hours (`0` = any time). A choice made in the dropdown overrides it on that device |
 | `show_flight_tracker` | `true` | Show the Track flight dropdown and the "Track a flight" field on the card |
 | `track_via_integration` | `true` | Follow flights that are not on the board through the Flightradar24 integration's "Add to track" feature (see Flight tracker) |

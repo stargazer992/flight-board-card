@@ -939,7 +939,7 @@ th .sorth.on { color:var(--fg); }
     // Track on / off switch: on when any of this flight's codes is tracked; flights listed in the YAML cannot be switched off here
     const trkCodes = this._trackedAll().filter(o => (r.keys || []).indexOf(o.code) >= 0);
     const trkOn = trkCodes.length > 0, trkLocked = trkOn && trkCodes.every(o => !o.extra);
-    if (this._config.show_flight_tracker !== false || trkOn) {
+    {
       h += `<div class="ptrk"><button class="ptsw${trkOn ? " on" : ""}" type="button" role="switch" aria-checked="${trkOn}"${trkLocked ? " disabled" : ""} data-code="${E(this._trkNorm(r.fl || pop.code))}" title="${trkLocked ? "Tracked from the card YAML" : "Track this flight"}"><span class="ptk"></span></button><span>Track this flight${trkLocked ? " (set in the card YAML)" : ""}</span></div>`;
     }
     // Only the gate that matters for this row: the arrival gate for an arrival, the departure gate for a departure

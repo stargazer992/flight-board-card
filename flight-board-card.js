@@ -1501,7 +1501,12 @@ tr[data-rk] { cursor:pointer; }
   _rdAirline(r) {
     const raw = r.raw || {}, iata = String(raw.airline_iata || "").toUpperCase();
     const logos = this._config.airline_logos && typeof this._config.airline_logos === "object" ? this._config.airline_logos : {};
-    const url = logos[iata];
+    // Try IATA code, ICAO code, then the letters at the start of the flight number (e.g. MX, MXY, WN, SWA)
+    const cand = [iata, String(raw.airline_icao || "").toUpperCase(), (String(r.fl || "").toUpperCase().match(/^[A-Z0-9]{2,3}?(?=\d)/) || [""])[0]];
+    const up = {};
+    Object.keys(logos).forEach((k) => { up[String(k).toUpperCase()] = logos[k]; });
+    let url = "";
+    for (let i = 0; i < cand.length; i++) { if (cand[i] && up[cand[i]]) { url = up[cand[i]]; break; } }
     const name = String(raw.airline_short || raw.airline || r.al || "");
     const top = url ? `<img class="alogo" src="${this._esc(url)}" alt="${this._esc(name)}">` : `<b class="aname">${this._esc(name)}</b>`;
     return top + `<span class="rfn">${this._esc(r.fl)}</span>`;

@@ -1868,6 +1868,15 @@ th .sorth.on { color:var(--fg); }
     return { from, to };
   }
   // Tracked-only card: time and status are about the ARRIVAL, in the destination airport's local time
+  // Time zone for the Time column of the tracking panel: tracked_timezone = "home" (Home Assistant's own zone), "airport" (the destination's local time) or any zone name such as America/New_York.
+  // Default: home on the tracked-only card, airport on the full board. Returns null for "airport".
+  _trkZone() {
+    let v = String(this._config.tracked_timezone || (this._config.show === "tracked" ? "home" : "airport"));
+    if (v.toLowerCase() === "airport") return null;
+    if (v.toLowerCase() === "home") v = (this._hass && this._hass.config && this._hass.config.time_zone) || this._config.timezone || "";
+    if (!v) return null;
+    try { new Intl.DateTimeFormat("en-US", { timeZone: v }); return v; } catch (e) { return null; }
+  }
   _arrRow(r, kind) {
     const lv = this._liveByKeys(r.idk || r.keys), sc = this._schedByKeys(r.idk || r.keys), raw = r.raw || {};
     const pick = k => { for (const src of [lv, sc, raw]) { const v = this._num(src && src[k]); if (v > 0) return v; } return 0; };
@@ -1876,7 +1885,7 @@ th .sorth.on { color:var(--fg); }
     // No estimated arrival yet: carry a late departure over to the arrival
     const sdp = pick("time_scheduled_departure"), edp = pick("time_estimated_departure");
     if (!ea && sa && sdp && edp && edp > sdp) ea = sa + (edp - sdp);
-    const to = this._ends(r, kind).to, tz = this._tzOf(to.k) || null;
+    const to = this._ends(r, kind).to, tz = this._trkZone() || this._tzOf(to.k) || null;
     const ts = ra || ea || sa;
     if (!ts) return {};   // no arrival time known: keep the board's own time and status
     const fm = x => this._fmt(x, tz);
@@ -1914,7 +1923,7 @@ th .sorth.on { color:var(--fg); }
     // Column titles are buttons that sort the board (not in the tracking panel)
     const sh = (k, label) => pfx === "trk" ? label :
       `<span class="sorth${this._sortKey === k ? " on" : ""}" data-sk="${k}" title="Sort by ${label.toLowerCase()}">${label}${this._sortKey === k ? (this._sortDir === -1 ? " &#9660;" : " &#9650;") : ""}</span>`;
-    const head = `<tr><th class="t">${sh("time", "Time")}</th>${ft ? `<th class="c">From</th><th class="c">To</th>` : `<th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th>`}<th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th>${hasX ? '<th class="x"></th>' : ""}</tr>`;
+    const head = `<tr><th class="t">${sh("time", "Time")}${ft && this._trkZone() ? ` ${this._esc(this._tzAbbr(Date.now() / 1000, this._trkZone()))}` : ""}</th>${ft ? `<th class="c">From</th><th class="c">To</th>` : `<th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th>`}<th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th>${hasX ? '<th class="x"></th>' : ""}</tr>`;
     let tstyle = "";
     if ((hasG || ft) && flap) {
       const gt = hasG ? this._gateTiles : 0, xt = hasX ? 1.5 : 0, tot = n.t + (ft ? 8 : n.c) + n.f + n.s + gt + xt;

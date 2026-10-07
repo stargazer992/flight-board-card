@@ -1,0 +1,4 @@
+# Keep API keys and credential files out of the public repository
+credentials*.json
+*.secret
+automation_flight_board_schedule.local.py

@@ -278,6 +278,9 @@ tr:nth-child(even) td { background:var(--zebra); }
 .hg .t { width:12%; } .hg .c { width:27%; } .hg .f { width:14%; } .hg .g { width:14%; } .hg .s { width:33%; }
 .h12 .hg .t { width:15%; } .h12 .hg .c { width:24%; }
 tr[data-rk] { cursor:pointer; }
+th .sorth { cursor:pointer; user-select:none; -webkit-user-select:none; }
+th .sorth:hover { text-decoration:underline; }
+th .sorth.on { color:var(--fg); }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
 .pclose { position:absolute; top:8px; right:12px; background:none; border:0; color:var(--sub); font-size:28px; line-height:1; cursor:pointer; padding:4px 8px; }
@@ -1649,7 +1652,10 @@ tr[data-rk] { cursor:pointer; }
     // London style: gate (departures) or baggage belt (arrivals) for every flight, when the gate sensor knows any
     const lon = this._theme === "london";
     const bg = !pfx && lon && rows.some(r => this._boardGate(r));
-    const head = `<tr><th class="t">Time</th><th class="c">${kind === "dep" ? "Destination" : "From"}</th><th class="f">Flight</th>${hasG ? '<th class="g">Gate</th>' : bg ? `<th class="g">${kind === "dep" ? "Gate" : "Belt"}</th>` : ""}<th class="s">Status</th></tr>`;
+    // Column titles are buttons that sort the board (not in the tracking panel)
+    const sh = (k, label) => pfx === "trk" ? label :
+      `<span class="sorth${this._sortKey === k ? " on" : ""}" data-sk="${k}" title="Sort by ${label.toLowerCase()}">${label}${this._sortKey === k ? (this._sortDir === -1 ? " &#9660;" : " &#9650;") : ""}</span>`;
+    const head = `<tr><th class="t">${sh("time", "Time")}</th><th class="c">${sh("city", kind === "dep" ? "Destination" : "From")}</th><th class="f">${sh("flight", "Flight")}</th>${hasG ? `<th class="g">${sh("gate", "Gate")}</th>` : bg ? `<th class="g">${sh("gate", kind === "dep" ? "Gate" : "Belt")}</th>` : ""}<th class="s">${sh("status", "Status")}</th></tr>`;
     let tstyle = "";
     if (hasG && flap) {
       const tot = n.t + n.c + n.f + n.s + this._gateTiles;

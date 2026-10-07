@@ -205,7 +205,7 @@ class FlightBoardCard extends HTMLElement {
 .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:2px 4px 14px; flex-wrap:wrap; }
 .name { font-size:calc(var(--fs) + 8px); font-weight:700; letter-spacing:1px; color:var(--title); text-transform:uppercase; }
 .name small { color:var(--accent); margin-left:10px; font-size:var(--fs); }
-.right { display:flex; align-items:center; gap:14px; }
+.right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; min-width:0; max-width:100%; }
 .apbox, .thbox, .albox, .wnbox, .rnbox, .trbox { position:relative; }
 .apin, .thbtn, .albtn, .wnbtn, .rnbtn, .trbtn { font-size:calc(var(--fs) * .62); padding:6px 10px; border-radius:6px; background:var(--selbg); color:var(--selfg);
   border:1px solid var(--line); font-family:inherit; text-shadow:none; }
@@ -288,6 +288,11 @@ th .sorth.on { color:var(--fg); }
 .board.narrow.splitflap .ph { letter-spacing:2px; }
 .board.narrow.splitflap td { padding-left:4px; padding-right:4px; }
 .board.tiny:not(.raleigh):not(.london) .ph { letter-spacing:1px; font-size:calc(var(--fs) * .7); }
+.board.narrow .top { margin:2px 0 10px; }
+.board.narrow .right { width:100%; justify-content:flex-start; gap:8px; }
+.board.narrow .apbox { flex:1 1 100%; }
+.board.narrow .apin { width:100%; box-sizing:border-box; }
+.board.narrow .clock { font-size:calc(var(--fs) + 2px); letter-spacing:1px; margin-left:auto; }
 .pop { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:16px; box-sizing:border-box; }
 .pcard { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; max-height:88vh; overflow:auto; padding:18px 20px 16px; box-shadow:0 12px 40px rgba(0,0,0,.55); font-family:var(--font); font-size:15px; position:relative; }
 .pclose { position:absolute; top:8px; right:12px; background:none; border:0; color:var(--sub); font-size:28px; line-height:1; cursor:pointer; padding:4px 8px; }

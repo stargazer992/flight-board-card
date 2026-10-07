@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Phones: the airport search, selectors and clock wrap onto the screen width instead of running off the side.
 - Split-flap on phones: each table shrinks its tiles until the flight number, gate and times fit (the tracking row with a gate column was cut off).
 - Click a column title to sort the board on it, in every style (Time, Destination/From, Flight, Gate, Status; Raleigh also City and Airline); click again to reverse. Remembered per device. Option `sort` sets the starting order.
 - Phones: column titles and the DEPARTURES / ARRIVALS / TRACKING banner shrink on narrow panels so they no longer overlap or wrap (all styles except Raleigh and London, which have their own sizing).

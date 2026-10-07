@@ -1509,7 +1509,12 @@ tr[data-rk] { cursor:pointer; }
     for (let i = 0; i < cand.length; i++) { if (cand[i] && up[cand[i]]) { url = up[cand[i]]; break; } }
     const name = String(raw.airline_short || raw.airline || r.al || "");
     const top = url ? `<img class="alogo" src="${this._esc(url)}" alt="${this._esc(name)}">` : `<b class="aname">${this._esc(name)}</b>`;
-    return top + `<span class="rfn">${this._esc(r.fl)}</span>`;
+    // Space between airline code and number so "F93330" reads "F9 3330"
+    const fl = String(r.fl || "").toUpperCase().replace(/\s+/g, "");
+    let pre = iata && fl.indexOf(iata) === 0 && /^\d/.test(fl.slice(iata.length)) ? iata : "";
+    if (!pre) { const m = fl.match(/^([A-Z][A-Z0-9]|[0-9][A-Z])(?=\d)/); pre = m ? m[1] : ""; }
+    const fnum = pre ? pre + " " + fl.slice(pre.length) : String(r.fl || "");
+    return top + `<span class="rfn">${this._esc(fnum)}</span>`;
   }
   _tableRaleigh(rows, kind, pfx) {
     const hasG = pfx === "trk" ? this._gateTiles > 0 : this._config.gates_entity && this._hass && !!this._hass.states[this._config.gates_entity];

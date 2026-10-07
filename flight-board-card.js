@@ -891,13 +891,13 @@ tr[data-rk] { cursor:pointer; }
   _fit() {
     const b = this.shadowRoot && this.shadowRoot.querySelector(".board");
     const p = this.shadowRoot && this.shadowRoot.querySelector(".panel");
+    this._cityFit();
     if (!b || !p || !p.clientWidth) return;
     const n = this._tiles4(), tot = n.t + n.c + n.f + n.s;
     const fs = Number(this._config.font_size) || 22;
     const f = Math.max(9, Math.min(fs, ((p.clientWidth - 56) / (tot + (this._gateTiles || 0)) - 2) / 0.78));
     b.style.setProperty("--tfs", f.toFixed(1) + "px");
     this._shorten();
-    this._cityFit();
     for (const k of ["t", "c", "f", "s"]) b.style.setProperty("--w" + k, (100 * n[k] / tot).toFixed(2) + "%");
   }
   // Raleigh style: when a city name does not fit its column (a phone, a narrow panel), that table shows
@@ -1710,6 +1710,7 @@ tr[data-rk] { cursor:pointer; }
     this._renderTrack();
     this._renderPopup();
     this._shorten();
+    this._cityFit();
     this._flapGo();
     root.querySelector(".foot").textContent = dd ? "Data: Flightradar24 - updated " + this._fmt(new Date(dd.last_updated).getTime() / 1000) + " - style: " + FBC_THEMES[this._theme] + (this._airline ? " - airline: " + this._airline : "") : "";
     this._tick();

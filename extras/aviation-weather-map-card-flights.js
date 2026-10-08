@@ -43,6 +43,8 @@
       this._flHandler = null;
     }
     this._flGroup = null;
+    this._flSig = "";
+    this._flFitted = false;
   }
 
   _drawFlights() {
@@ -50,7 +52,8 @@
       const L = this._L, map = this._map, grp = this._flGroup;
       if (!L || !map || !grp) return;
       grp.clearLayers();
-      if (this._flOff) return;
+      if (this._flOff) { this._flSig = ""; return; }
+      const shown = [], sigs = [];
       let geo = [], tracked = [];
       for (const p of ["flight-board-card", "flight-board-card-test"]) {
         try { geo = geo.concat((JSON.parse(localStorage.getItem(p + "-geo") || "{}") || {}).flights || []); } catch (e) { /* ignore */ }
@@ -94,6 +97,8 @@
           // heading along the line as drawn on the map
           const pa = map.latLngToLayerPoint(L.latLng(A[0], A[1])), pb = map.latLngToLayerPoint(L.latLng(B[0], B[1]));
           const hdg = (Math.atan2(pb.x - pa.x, -(pb.y - pa.y)) * 180 / Math.PI + 360) % 360;
+          shown.push(A, B);
+          sigs.push((f.keys || [])[0] || f.fl);
           L.polyline([A, pos], { color: color, weight: 3, opacity: 0.95, interactive: false }).addTo(grp);
           L.polyline([pos, B], { color: color, weight: 2, opacity: 0.8, dashArray: "6 7", interactive: false }).addTo(grp);
           // airport labels
@@ -115,6 +120,16 @@
         } catch (err) {
           console.warn("aviation-weather-map-card: could not draw a tracked flight", err);
         }
+      }
+      // Zoom out so the whole route(s) show, until you zoom / move the map yourself (a newly tracked flight zooms out again)
+      const sig = sigs.sort().join("|");
+      if (!shown.length) { this._flSig = ""; return; }
+      if (sig !== this._flSig) {
+        if (!this._viewReady || !map.getSize().x) { setTimeout(() => { try { this._drawFlights(); } catch (e) { /* ignore */ } }, 600); return; }
+        this._flSig = sig;
+        this._flManual = false;
+        this._flFitted = true;
+        map.fitBounds(L.latLngBounds(shown), { padding: [50, 50], maxZoom: 7, animate: false });
       }
     } catch (err) {
       console.warn("aviation-weather-map-card: tracked flights failed", err);
@@ -176,6 +191,10 @@
       try { if (this._flOff === undefined) this._flOff = localStorage.getItem(KEY) === "1"; } catch (e) { this._flOff = false; }
       const r = origFlInit.apply(this, arguments);
       try {
+        const mapEl = this.shadowRoot && this.shadowRoot.querySelector(".map");
+        if (mapEl) ["pointerdown", "wheel", "touchstart", "keydown"].forEach((evt) => mapEl.addEventListener(evt, () => { this._flManual = true; }, { passive: true }));
+      } catch (e) { /* ignore */ }
+      try {
         const bar = this.shadowRoot && this.shadowRoot.querySelector(".bar");
         if (bar && this._cfg && this._cfg.show_tracked_flights !== false && !bar.querySelector("[data-flights-btn]")) {
           const btn = document.createElement("button");
@@ -190,6 +209,11 @@
         this._renderLegend();
       } catch (e) { /* ignore */ }
       return r;
+    };
+    const origRefit = P._refit;
+    P._refit = function () {
+      if (this._flFitted && !this._flManual && this._flSig) return;   // keep the zoomed-out view of the tracked flight(s)
+      return origRefit.apply(this, arguments);
     };
     P._teardown = function () {
       try { this._teardownFlights(); } catch (e) { /* ignore */ }

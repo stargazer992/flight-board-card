@@ -67,78 +67,35 @@
           const hrs = Number(cfg.flight_remove_after_hours) || 2;
           if (f.landed && f.arr && now > f.arr + hrs * 3600) continue;               // landed a while ago
           if (!f.landed && f.arr && now > f.arr + 6 * 3600) continue;                // stale record
-          const A = f.o.ll, B = f.d.ll;
-          // great-circle points, longitudes unwrapped so the line never jumps across the map
-          const p1 = A[0] * rad, l1 = A[1] * rad, p2 = B[0] * rad, l2 = B[1] * rad;
-          const dd = 2 * Math.asin(Math.sqrt(Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin((l2 - l1) / 2) ** 2));
-          const gc = (fr) => {
-            if (!(dd > 1e-6)) return [A[0], A[1]];
-            const a = Math.sin((1 - fr) * dd) / Math.sin(dd), b = Math.sin(fr * dd) / Math.sin(dd);
-            const x = a * Math.cos(p1) * Math.cos(l1) + b * Math.cos(p2) * Math.cos(l2);
-            const y = a * Math.cos(p1) * Math.sin(l1) + b * Math.cos(p2) * Math.sin(l2);
-            const z = a * Math.sin(p1) + b * Math.sin(p2);
-            return [Math.atan2(z, Math.sqrt(x * x + y * y)) / rad, Math.atan2(y, x) / rad];
+          // Simple straight line A > B (not the real route); the plane sits on it
+          const A = f.o.ll, B = [f.d.ll[0], f.d.ll[1]];
+          while (B[1] - A[1] > 180) B[1] -= 360;
+          while (B[1] - A[1] < -180) B[1] += 360;
+          const nm = (p, q) => {
+            const a1 = p[0] * rad, a2 = q[0] * rad, d1 = (q[0] - p[0]) * rad, d2 = (q[1] - p[1]) * rad;
+            const h = Math.sin(d1 / 2) ** 2 + Math.cos(a1) * Math.cos(a2) * Math.sin(d2 / 2) ** 2;
+            return 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
           };
-          const pts = [];
-          let prev = A[1];
-          for (let i = 0; i <= 64; i++) {
-            const q = gc(i / 64);
-            while (q[1] - prev > 180) q[1] -= 360;
-            while (q[1] - prev < -180) q[1] += 360;
-            prev = q[1];
-            pts.push(q);
-          }
-          // progress from the departure and arrival times
-          let prog = 0;
-          if (f.landed) prog = 1;
-          else if (f.dep && f.arr && f.arr > f.dep) prog = Math.max(0, Math.min(1, (now - f.dep) / (f.arr - f.dep)));
           const liveOk = f.live && !f.landed && now - (f.t || 0) <= (Number(cfg.flight_live_max_age) || 600);
-          let pos, hdg;
-          if (liveOk) {
-            pos = [f.live[0], f.live[1]];
-            if (pts.length) { const ref = pts[Math.round(prog * 64)]; while (pos[1] - ref[1] > 180) pos[1] -= 360; while (pos[1] - ref[1] < -180) pos[1] += 360; }
-            hdg = f.live[2];
-          } else {
-            pos = gc(prog);
-            const ref = pts[Math.round(prog * 64)]; if (ref) pos = [ref[0], ref[1]];
+          let prog = 0, how = "";
+          if (f.landed) { prog = 1; how = "Landed"; }
+          else if (liveOk) {
+            // by distance: miles flown / (miles flown + miles to go), from the live position
+            const lp = [f.live[0], f.live[1]];
+            const d1 = nm(A, lp), d2 = nm(lp, f.d.ll);
+            prog = d1 + d2 > 0 ? Math.max(0, Math.min(1, d1 / (d1 + d2))) : 0;
+            how = "Live: " + Math.round(d2).toLocaleString("en-US") + " nm to go";
+          } else if (f.dep && f.arr && f.arr > f.dep) {
+            // by time: share of the scheduled / estimated flight time that has passed
+            prog = Math.max(0, Math.min(1, (now - f.dep) / (f.arr - f.dep)));
+            how = prog <= 0 ? "Not departed yet" : "Approx. " + Math.round(prog * 100) + "% of the way (by time)";
           }
-          if (hdg === null || hdg === undefined || !isFinite(hdg)) {
-            const i = Math.min(63, Math.round(prog * 64)), a = pts[i], b = pts[i + 1] || pts[i];
-            hdg = (Math.atan2((b[1] - a[1]) * Math.cos(a[0] * rad), b[0] - a[0]) / rad + 360) % 360;
-          }
-          // route: solid = where it has been, dashed = projected rest of the way
-          let cut = 0;
-          for (let i = 0; i < pts.length; i++) if (i / 64 <= prog) cut = i;
-          let done = pts.slice(0, cut + 1).concat([pos]), rest = [pos].concat(pts.slice(cut + 1)), trackNote = "";
-          const tr = Array.isArray(f.trail) && f.trail.length > 1 && !f.landed ? f.trail : null;
-          if (tr) {
-            // the real track flown so far (Flightradar24), longitudes unwrapped; the plane sits at its end
-            const real = [];
-            let pl = tr[0][1];
-            for (const q of tr) { let lo = q[1]; while (lo - pl > 180) lo -= 360; while (lo - pl < -180) lo += 360; pl = lo; real.push([q[0], lo]); }
-            const end = real[real.length - 1];
-            pos = [end[0], end[1]];
-            const a2 = real[real.length - 2];
-            hdg = (Math.atan2((end[1] - a2[1]) * Math.cos(end[0] * rad), end[0] - a2[0]) / rad + 360) % 360;
-            // projected rest: great circle from the plane to the destination
-            const q1 = end[0] * rad, m1 = end[1] * rad, q2 = B[0] * rad;
-            let m2 = B[1];
-            while (m2 - end[1] > 180) m2 -= 360; while (m2 - end[1] < -180) m2 += 360;
-            m2 *= rad;
-            const d2 = 2 * Math.asin(Math.min(1, Math.sqrt(Math.sin((q2 - q1) / 2) ** 2 + Math.cos(q1) * Math.cos(q2) * Math.sin((m2 - m1) / 2) ** 2)));
-            rest = [[end[0], end[1]]];
-            if (d2 > 1e-6) for (let i = 1; i <= 48; i++) {
-              const fr = i / 48, a = Math.sin((1 - fr) * d2) / Math.sin(d2), b = Math.sin(fr * d2) / Math.sin(d2);
-              const x = a * Math.cos(q1) * Math.cos(m1) + b * Math.cos(q2) * Math.cos(m2), y = a * Math.cos(q1) * Math.sin(m1) + b * Math.cos(q2) * Math.sin(m2), z = a * Math.sin(q1) + b * Math.sin(q2);
-              rest.push([Math.atan2(z, Math.sqrt(x * x + y * y)) / rad, Math.atan2(y, x) / rad]);
-            }
-            done = real;
-            // Flightradar24 only keeps the recent part of the track: join the departure airport to its start with a thin line
-            L.polyline([[A[0], real[0][1] > A[1] + 180 ? A[1] + 360 : real[0][1] < A[1] - 180 ? A[1] - 360 : A[1]], real[0]], { color: color, weight: 2, opacity: 0.45, interactive: false }).addTo(grp);
-            trackNote = "Real track flown";
-          }
-          L.polyline(done, { color: color, weight: 3, opacity: 0.95, interactive: false }).addTo(grp);
-          L.polyline(rest, { color: color, weight: 2, opacity: 0.8, dashArray: "6 7", interactive: false }).addTo(grp);
+          const pos = [A[0] + (B[0] - A[0]) * prog, A[1] + (B[1] - A[1]) * prog];
+          // heading along the line as drawn on the map
+          const pa = map.latLngToLayerPoint(L.latLng(A[0], A[1])), pb = map.latLngToLayerPoint(L.latLng(B[0], B[1]));
+          const hdg = (Math.atan2(pb.x - pa.x, -(pb.y - pa.y)) * 180 / Math.PI + 360) % 360;
+          L.polyline([A, pos], { color: color, weight: 3, opacity: 0.95, interactive: false }).addTo(grp);
+          L.polyline([pos, B], { color: color, weight: 2, opacity: 0.8, dashArray: "6 7", interactive: false }).addTo(grp);
           // airport labels
           for (const end of [[f.o, A], [f.d, B]]) {
             L.circleMarker([end[1][0], end[1][1]], { radius: 4, color: "#000", weight: 1, fillColor: color, fillOpacity: 1, interactive: false })
@@ -152,8 +109,7 @@
             zIndexOffset: 2000,
             keyboard: false,
           });
-          const age = Math.max(0, Math.round((now - (f.t || now)) / 60));
-          const what = f.landed ? "Landed" : trackNote ? trackNote + (age > 10 ? " (last update " + age + " min ago)" : "") : liveOk ? "Live position" : prog <= 0 ? "Not departed yet" : "Approx. " + Math.round(prog * 100) + "% of the way";
+          const what = how;
           mk.bindTooltip("<b>" + String(f.fl || "").replace(/</g, "") + "</b> " + String(f.o.k || "") + " &rarr; " + String(f.d.k || "") + "<br>" + what, { direction: "top", offset: [0, -12] });
           mk.addTo(grp);
         } catch (err) {

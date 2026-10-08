@@ -148,6 +148,8 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `flip_on_load` | `true` | Spin every tile in from blank on first load |
 | `flip_step_ms` | `55` | Milliseconds per character step (higher = slower) |
 | `flip_max_steps` | `24` | Most characters a tile scrolls through before settling (lower = faster) |
+| `flip_sound` | `false` | Play a synthesized split-flap clatter (a clack per flap, a deeper click as a tile lands). Browsers only allow sound after you tap or click the page once |
+| `flip_sound_volume` | `0.35` | Volume of the clatter, 0 to 1 |
 | `airports` | built-in list | Favourite airports shown when the search field is empty (see below) |
 | `title` | airport name | Your own title instead of the airport name |
 | `departures_entity` | `sensor.flightradar24_airport_departures` | Departures sensor |

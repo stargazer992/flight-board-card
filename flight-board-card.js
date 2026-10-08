@@ -108,31 +108,48 @@ function fbcFlapInit() {
     return a;
   } catch (e) { return null; }
 }
-function fbcFlapSound(volume, durMs, tiles, tries) {
+function fbcFlapSound(volume, tiles, tries) {
   try {
     const a = fbcFlapInit();
     if (!a) return;
     const ctx = a.ctx;
     if (ctx.state !== "running") { try { ctx.resume(); } catch (e) {} return; }
-    if (!a.buf) { if ((tries || 0) < 10) setTimeout(() => fbcFlapSound(volume, Math.max(250, durMs - 200), tiles, (tries || 0) + 1), 200); return; }   // still decoding: try again shortly
-    const now = ctx.currentTime;
-    if (now < a.until) return;                    // a clatter is already playing: it covers this batch too
+    if (!a.buf) { if ((tries || 0) < 10) setTimeout(() => fbcFlapSound(volume, tiles, (tries || 0) + 1), 200); return; }   // still decoding: try again shortly
     const vol = Math.max(0, Math.min(1, Number(volume))) || 0;
     if (!vol) return;
-    const dur = Math.max(0.25, Math.min(30, durMs / 1000));
+    const now = ctx.currentTime, peak = vol * Math.min(1, 0.35 + tiles / 40);
+    const c = a.cur;
+    if (c) {
+      // already clattering: keep going (louder if more tiles joined) until the flipping really ends
+      if (peak > c.peak) { c.peak = peak; try { c.g.gain.cancelScheduledValues(now); c.g.gain.setValueAtTime(c.g.gain.value, now); c.g.gain.linearRampToValueAtTime(peak, now + 0.15); } catch (e) {} }
+      return;
+    }
+    // plays the whole recording, then loops its steady middle part, until fbcFlapStop() is called
     const src = ctx.createBufferSource();
     src.buffer = a.buf;
-    // longer than the clip: loop its steady middle part
-    if (dur > a.buf.duration - 0.05) { src.loop = true; src.loopStart = 0.3; src.loopEnd = Math.max(0.5, a.buf.duration - 0.3); }
-    const g = ctx.createGain(), peak = vol * Math.min(1, 0.35 + tiles / 40);
+    src.loop = true; src.loopStart = 0.3; src.loopEnd = Math.max(0.5, a.buf.duration - 0.3);
+    const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, now);
     g.gain.linearRampToValueAtTime(peak, now + 0.06);
-    g.gain.setValueAtTime(peak, now + Math.max(0.07, dur - 0.25));
-    g.gain.linearRampToValueAtTime(0.0001, now + dur);
     src.connect(g); g.connect(ctx.destination);
     src.start(now);
-    src.stop(now + dur + 0.02);
-    a.until = now + dur;
+    a.cur = { src, g, peak };
+    clearTimeout(a.guard);
+    a.guard = setTimeout(() => fbcFlapStop(), 60000);   // safety: never play for more than a minute
+  } catch (e) {}
+}
+// Fade the clatter out (called when the last tile has stopped flipping)
+function fbcFlapStop() {
+  try {
+    const a = window.__fbcAudio;
+    if (!a || !a.cur) return;
+    const { src, g } = a.cur, now = a.ctx.currentTime;
+    a.cur = null;
+    clearTimeout(a.guard);
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), now);
+    g.gain.linearRampToValueAtTime(0.0001, now + 0.35);
+    src.stop(now + 0.4);
   } catch (e) {}
 }
 function fbcDb() {
@@ -1963,7 +1980,8 @@ th .sorth.on { color:var(--fg); }
         // this tap is the gesture browsers need: unlock the audio now and play a short clatter as confirmation
         const a = fbcFlapInit();
         try { if (a) a.ctx.resume(); } catch (err) {}
-        fbcFlapSound(this._config.flip_sound_volume === undefined ? 0.8 : this._config.flip_sound_volume, 1200, 12);
+        fbcFlapSound(this._config.flip_sound_volume === undefined ? 0.8 : this._config.flip_sound_volume, 12);
+        setTimeout(fbcFlapStop, 1500);
       }
     });
   }
@@ -1992,12 +2010,9 @@ th .sorth.on { color:var(--fg); }
       fresh.push({ el, seq, i: 0, tog: 0, at: t0 + d * 35 + Math.random() * 120 });
     });
     this._fl = (this._fl || []).concat(fresh);
-    // One recorded clatter for this batch, as long as the flipping lasts
-    if (fresh.length && this._sndOn()) {
-      let longest = 0;
-      for (const f of fresh) longest = Math.max(longest, (f.at - t0) + (f.seq.length - 1) * step);
-      fbcFlapSound(this._config.flip_sound_volume === undefined ? 0.8 : this._config.flip_sound_volume, longest, fresh.length);
-    }
+    // One recorded clatter while tiles are flipping; it fades out when the last tile has landed (see _flapLoop)
+    (window.__fbcFlipCards = window.__fbcFlipCards || new Set()).add(this);
+    if (fresh.length && this._sndOn()) fbcFlapSound(this._config.flip_sound_volume === undefined ? 0.8 : this._config.flip_sound_volume, fresh.length);
     this._flapLoop();
   }
   _flapLoop() {
@@ -2023,6 +2038,7 @@ th .sorth.on { color:var(--fg); }
       }
       this._fl = next;
       if (next.length) this._flRaf = requestAnimationFrame(run);
+      else if (this._sndOn()) setTimeout(() => { let busy = false; for (const c of window.__fbcFlipCards || []) if (c._fl && c._fl.length) busy = true; if (!busy) fbcFlapStop(); }, 250);   // the last flap has landed: fade the clatter out
     };
     this._flRaf = requestAnimationFrame(run);
   }

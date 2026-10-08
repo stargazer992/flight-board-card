@@ -196,8 +196,8 @@ class FlightBoardCard extends HTMLElement {
     return { icao: v, iata: this._config.code || v, name: this._config.title || v, tz: this._config.timezone };
   }
   // Time zone of any airport by IATA/ICAO code (null when unknown, so the board airport's zone is used)
-  _tzOf(code) {
-    if (this._tzMode !== "airport" || !code) return null;
+  _tzOf(code, always) {
+    if ((this._tzMode !== "airport" && !always) || !code) return null;
     const v = String(code).toUpperCase();
     const hit = fbcDb().find(a => a.iata === v || a.icao === v);
     return hit && hit.tz ? hit.tz : null;
@@ -1885,7 +1885,7 @@ th .sorth.on { color:var(--fg); }
     // No estimated arrival yet: carry a late departure over to the arrival
     const sdp = pick("time_scheduled_departure"), edp = pick("time_estimated_departure");
     if (!ea && sa && sdp && edp && edp > sdp) ea = sa + (edp - sdp);
-    const to = this._ends(r, kind).to, tz = this._trkZone() || this._tzOf(to.k) || null;
+    const to = this._ends(r, kind).to, tz = this._trkZone() || this._tzOf(to.k, true) || null;   // always the destination airport's own zone: the pop-up Times switch does not apply here
     const ts = ra || ea || sa;
     if (!ts) return {};   // no arrival time known: keep the board's own time and status
     const fm = x => this._fmt(x, tz);

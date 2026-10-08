@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.10.0 (fork)
+- Pop-up: a small route map (land outline, great-circle route, both airports) with the plane on it. It uses the live position when known, else an approximate position from the share of time between departure and arrival, with a caption saying which. Airport positions come from the flight data or a built-in table (no map service, nothing loaded from the internet). Works across the Pacific.
 - Tracking panel: the Time column is always in the destination airport's own time zone, whatever airport the board shows and whatever the pop-up Times switch is set to (the switch only affects the pop-up).
 - Tracked-only card: the Time column is now in your Home Assistant time zone (for example Eastern, with the zone name in the column title) instead of the destination's. New option `tracked_timezone`: `home` (default on the tracked-only card), `airport` (destination local time, default on the full board) or any zone name such as `America/New_York`.
 - Tracked flights are shared live between cards: track or untrack a flight on a board card (or in its pop-up) and any other flight-board card in the same browser, such as the main-dashboard tracked-only card, updates immediately, in other tabs too, without reloading the page.

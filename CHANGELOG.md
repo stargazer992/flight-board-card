@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The card now saves the positions of tracked flights (`flight-board-card-geo` in this browser) so a map card can draw them. Used by the optional aviation-weather-map-card add-on.
+
 ## 1.10.0 (fork)
 - Pop-up: a small route map (land outline, great-circle route, both airports) with the plane on it. It uses the live position when known, else an approximate position from the share of time between departure and arrival, with a caption saying which. Airport positions come from the flight data or a built-in table (no map service, nothing loaded from the internet). Works across the Pacific.
 - Tracking panel: the Time column is always in the destination airport's own time zone, whatever airport the board shows and whatever the pop-up Times switch is set to (the switch only affects the pop-up).

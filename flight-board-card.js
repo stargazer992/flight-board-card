@@ -1671,6 +1671,51 @@ th .sorth.on { color:var(--fg); }
       }
     }
     trk.innerHTML = h;
+    this._publishGeo(found, all);
+  }
+  // Position data of the tracked flights for the aviation-weather-map-card (same browser): saved in localStorage
+  // "flight-board-card-geo" as {flights:[...]}; the map card draws the route and the plane from it.
+  _trkGeo(r) {
+    const sc = this._schedByKeys(r.idk || r.keys), lv = this._liveByKeys(r.idk || r.keys), raw = r.raw || {}, ap = this._ap();
+    const has = v => v !== undefined && v !== null && String(v).trim() !== "" && String(v).trim().toLowerCase() !== "n/a";
+    const pick = (...vals) => { for (const v of vals) if (has(v)) return v; return null; };
+    const g = k => pick(lv && lv[k], sc && sc[k]);
+    const src = lv || sc;
+    let oc, dc;
+    if (src) { oc = g("airport_origin_code_iata"); dc = g("airport_destination_code_iata"); }
+    else { const other = raw.airport_code_iata; if (r.kind === "dep") { oc = ap.iata; dc = other; } else { oc = other; dc = ap.iata; } }
+    const ll = (code, la, lo) => {
+      if (has(la) && has(lo) && isFinite(Number(la)) && isFinite(Number(lo))) return [Number(la), Number(lo)];
+      const hit = fbcDb().find(x => x.iata === String(code || "").toUpperCase());
+      return hit && hit.lat !== undefined ? [hit.lat, hit.lon] : null;
+    };
+    const a = ll(oc, g("airport_origin_latitude"), g("airport_origin_longitude")), b = ll(dc, g("airport_destination_latitude"), g("airport_destination_longitude"));
+    if (!a || !b) return null;
+    const T = k => { const v = this._num(pick(lv && lv[k], sc && sc[k], raw[k])); return v > 0 ? v : 0; };
+    const dep = T("time_real_departure") || T("time_estimated_departure") || T("time_scheduled_departure");
+    const arr = T("time_real_arrival") || T("time_estimated_arrival") || T("time_scheduled_arrival");
+    const ra = T("time_real_arrival");
+    let live = null;
+    if (lv && has(lv.latitude) && has(lv.longitude) && !(lv.on_ground !== undefined && Number(lv.on_ground) === 1)) live = [Number(lv.latitude), Number(lv.longitude), has(lv.heading) ? Number(lv.heading) : null];
+    else if (sc && has(sc.os_latitude) && has(sc.os_longitude) && !sc.os_on_ground) live = [Number(sc.os_latitude), Number(sc.os_longitude), has(sc.os_heading) ? Number(sc.os_heading) : null];
+    return { fl: r.fl || (r.keys && r.keys[0]) || "", keys: r.keys || [], o: { k: oc || "", ll: a }, d: { k: dc || "", ll: b }, dep, arr, landed: !!ra || !!(lv && lv.has_landed), live, t: Math.floor(Date.now() / 1000) };
+  }
+  _publishGeo(found, all) {
+    try {
+      const k = "flight-board-card-geo";
+      let cur = {};
+      try { cur = JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { cur = {}; }
+      const list = Array.isArray(cur.flights) ? cur.flights : [];
+      const mine = [];
+      for (const r of found) { try { const e = this._trkGeo(r); if (e) { const old = list.find(x => (x.keys || []).some(y => (e.keys || []).indexOf(y) >= 0)); if (old && e.t - (old.t || 0) < 120 && JSON.stringify([old.live, old.landed, old.dep, old.arr, old.o, old.d]) === JSON.stringify([e.live, e.landed, e.dep, e.arr, e.o, e.d])) e.t = old.t; e.yaml = all.some(o => !o.extra && (r.keys || []).indexOf(o.code) >= 0); mine.push(e); } } catch (e) {} }
+      const same = (a, b) => (a.keys || []).some(x => (b.keys || []).indexOf(x) >= 0);
+      const out = list.filter(x => !mine.some(m => same(m, x)) && Date.now() / 1000 - (x.t || 0) < 6 * 3600);
+      const txt = JSON.stringify({ flights: out.concat(mine) });
+      if (txt !== localStorage.getItem(k)) {
+        localStorage.setItem(k, txt);
+        window.dispatchEvent(new CustomEvent("flight-board-card-geo"));
+      }
+    } catch (e) {}
   }
   _airlines() {
     const src = Array.isArray(this._config.airlines) && this._config.airlines.length ? this._config.airlines : FBC_AIRLINES;

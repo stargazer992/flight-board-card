@@ -521,7 +521,10 @@ th .sorth.on { color:var(--fg); }
 .ch.s1 { animation: chs1 var(--stepms, 55ms) linear both; will-change:transform; }
 .ch.s2 { animation: chs2 var(--stepms, 55ms) linear both; will-change:transform; }
 /* Optional metallic gloss (flip_shine: true). Painted with background layers only (no pseudo-elements, no per-flip extra animation) so hundreds of tiles can still flip smoothly. */
-.board.shine .ch { background:linear-gradient(180deg, rgba(255,255,255,.2) 0, rgba(255,255,255,.04) 49%, rgba(0,0,0,0) 49%), linear-gradient(#3a3a3a 0 49%, #000 49% 51%, #2a2a2a 51% 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.6); }
+.board.shine .ch { background:
+    linear-gradient(180deg, transparent 0 51%, rgba(255,255,255,.10) 51% 53%, transparent 53%),
+    linear-gradient(180deg, #4b4b4d 0, #353537 22%, #262628 49%, #000 49% 51%, #1c1c1e 51%, #242426 80%, #2d2d2f 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 1px 0 0 rgba(255,255,255,.06), inset -1px 0 0 rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.8), 0 2px 3px rgba(0,0,0,.45); text-shadow:0 1px 1px rgba(0,0,0,.7); }
 @keyframes chs1 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25) } 100% { transform:scaleY(1) } }
 @keyframes chs2 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25) } 100% { transform:scaleY(1) } }
 .board.splitflap .clock { font-size:var(--fs); letter-spacing:0; }

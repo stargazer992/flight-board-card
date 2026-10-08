@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Map add-on (`extras/aviation-weather-map-card-flights.js`): when the data source stops updating a flight's position (the last fix is older than `flight_fix_stale_seconds`, default 300), the plane is moved from that fix toward the destination in step with the arrival estimate, so it matches the time-to-go label. The label then says "est. position".
-- Optional split-flap sound (`flip_sound: true`, `flip_sound_volume`): a synthesized clatter, one clack per flap and a deeper click when a tile lands. Browsers play it only after you have tapped or clicked the page once.
+- Optional split-flap sound (`flip_sound: true`, `flip_sound_volume`): one real split-flap recording from FlipOff (MIT, magnum6actual), played once per board refresh and trimmed or looped to the length of the animation. Browsers play it only after you have tapped or clicked the page once.
 - The pop-up route map is now a straight line A to B; the plane sits on it by miles to go (live) or by time, and points along the flight's own heading.
 - The card now saves the positions of tracked flights (`flight-board-card-geo` in this browser) so a map card can draw them. Used by the optional aviation-weather-map-card add-on.
 

@@ -49,6 +49,29 @@
     this._flFitted = false;
   }
 
+  // Center button: puts the tracked flight's plane in the middle of the map; with no tracked flight, a favorite airport.
+  // With several flights (or favorites) each press moves on to the next one.
+  _flCenter() {
+    const map = this._map;
+    if (!map) return;
+    let targets = (this._flPlanes || []).map((q) => ({ pos: q.pos, name: q.name, kind: "flight" }));
+    if (!targets.length) {
+      const favs = this._favs || new Set();
+      for (const e of this._entries ? this._entries.values() : []) {
+        if (e && e.st && favs.has(String(e.st.id).toUpperCase())) targets.push({ pos: [e.st.lat, e.st.lon], name: String(e.st.id), kind: "favorite" });
+      }
+      targets.sort((a, b) => (a.name < b.name ? -1 : 1));
+    }
+    if (!targets.length) { try { this._showBanner("Nothing to center on: no tracked flight and no favorite airport."); setTimeout(() => this._hideBanner(), 3000); } catch (e) { /* ignore */ } return; }
+    const kind = targets[0].kind;
+    this._flCIdx = (kind === this._flCKind ? (this._flCIdx || 0) + 1 : 0) % targets.length;
+    this._flCKind = kind;
+    const t = targets[this._flCIdx];
+    this._flManual = true;    // stop the automatic fit
+    this._userMoved = true;   // and the card's own re-fit
+    map.setView(t.pos, Math.max(map.getZoom(), 5), { animate: true });
+  }
+
   // Tap the plane: open the flight-board-card's details page for that flight. A hidden copy of the board card is kept
   // inside this card (it works on any dashboard view); its pop-up is shown on top of the map.
   _flOpen(f) {
@@ -88,6 +111,7 @@
       const L = this._L, map = this._map, grp = this._flGroup;
       if (!L || !map || !grp) return;
       grp.clearLayers();
+      this._flPlanes = [];
       if (this._flOff) { this._flSig = ""; return; }
       const shown = [], sigs = [];
       let geo = [], tracked = [];
@@ -163,6 +187,7 @@
           mk.bindTooltip(parts.join(", "), { permanent: true, direction: "right", offset: [14, 0], className: "awm-fl-label" });
           mk.on("click", () => { try { this._flOpen(f); } catch (e) { console.warn("aviation-weather-map-card: flight details failed", e); } });
           mk.addTo(grp);
+          this._flPlanes.push({ pos: pos, name: String(f.fl || "") });
         } catch (err) {
           console.warn("aviation-weather-map-card: could not draw a tracked flight", err);
         }
@@ -183,7 +208,7 @@
   }
 
     }.prototype;
-    for (const k of ["_initFlights", "_teardownFlights", "_drawFlights", "_flOpen"]) P[k] = cls[k];
+    for (const k of ["_initFlights", "_teardownFlights", "_drawFlights", "_flOpen", "_flCenter"]) P[k] = cls[k];
     const origInit = P._initMap, origTear = P._teardown;
     P._initMap = function () {
       const r = origInit.apply(this, arguments);
@@ -228,6 +253,11 @@
           h.textContent = "Flights";
           legend.appendChild(h);
           legend.appendChild(row);
+          const crow = document.createElement("div");
+          crow.className = "row";
+          crow.innerHTML = '<span class="dot star">\u25ce</span><span>Center on flight / favorite</span><span class="count"></span>';
+          crow.addEventListener("click", () => this._flCenter());
+          legend.appendChild(crow);
         }
       } catch (e) { /* ignore */ }
       return r;
@@ -251,6 +281,15 @@
           if (!this._flOff) btn.classList.add("on");
           btn.addEventListener("click", () => setOff(this, !this._flOff));
           bar.appendChild(btn);
+        }
+        if (bar && !bar.querySelector("[data-flights-center]")) {
+          const cb = document.createElement("button");
+          cb.setAttribute("data-bar", "center");
+          cb.setAttribute("data-flights-center", "1");
+          cb.title = "Center the map on the tracked flight (or a favorite airport); press again for the next one";
+          cb.textContent = "\u25ce Center";
+          cb.addEventListener("click", () => this._flCenter());
+          bar.appendChild(cb);
         }
         this._renderLegend();
       } catch (e) { /* ignore */ }

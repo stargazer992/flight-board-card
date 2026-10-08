@@ -359,7 +359,7 @@ th .sorth.on { color:var(--fg); }
 .psub { color:var(--sub); font-size:13px; margin-top:2px; }
 .proute { display:flex; align-items:center; gap:12px; margin:14px 0 6px; }
 .proute .pa { flex:1; } .proute .pa b { display:block; font-size:24px; letter-spacing:1px; } .proute .pa span { color:var(--sub); font-size:13px; }
-.proute .pm { color:var(--sub); flex:0 0 26%; display:flex; align-items:center; gap:2px; } .proute .pm svg { height:12px; } .proute .pm svg:first-child { flex:1; min-width:0; width:100%; } .proute .pm .pa2 { width:8px; flex:none; }
+.proute .pm { color:var(--sub); flex:0 0 26%; display:flex; align-items:center; gap:2px; position:relative; } .proute .pm .pmcd { position:absolute; left:-20%; right:-20%; bottom:100%; margin-bottom:1px; text-align:center; font-size:12px; white-space:nowrap; color:var(--fg); } .proute .pm svg { height:12px; } .proute .pm svg:first-child { flex:1; min-width:0; width:100%; } .proute .pm .pa2 { width:8px; flex:none; }
 .pbadge { display:inline-block; margin:6px 0 2px; padding:3px 10px; border-radius:20px; font-weight:700; font-size:13px; letter-spacing:1px; border:1px solid var(--line); }
 .pbadge.ok { color:var(--ok); } .pbadge.warn { color:var(--warn); } .pbadge.bad { color:var(--bad); }
 .psec { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
@@ -1015,8 +1015,8 @@ th .sorth.on { color:var(--fg); }
     // Only the gate that matters for this row: the arrival gate for an arrival, the departure gate for a departure
     const signs = r.kind === "arr" ? sign("Arrival gate", d.code, dg, true, "arr") : sign("Departure gate", o.code, og, false, "dep");
     if (signs) h += `<div class="gsigns">${signs}</div>`;
-    h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm"><svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="98" y2="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/></svg><svg class="pa2" viewBox="0 0 10 12" aria-hidden="true"><path d="M1 1 L9 6 L1 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
-    h += `<span class="pbadge${cls}">${E(r.s)}</span>${cd ? ` <span class="psub">${E(cd)}</span>` : ""}`;
+    h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm">${cd ? `<span class="pmcd">${E(cd)}</span>` : ""}<svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="98" y2="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/></svg><svg class="pa2" viewBox="0 0 10 12" aria-hidden="true"><path d="M1 1 L9 6 L1 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
+    h += `<span class="pbadge${cls}">${E(r.s)}</span>`;
     // Route map (needs both airport positions)
     try {
       const ll = (code, la, lo) => {

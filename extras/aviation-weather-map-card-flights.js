@@ -96,7 +96,10 @@
           const pos = [A[0] + (B[0] - A[0]) * prog, A[1] + (B[1] - A[1]) * prog];
           // heading along the line as drawn on the map
           const pa = map.latLngToLayerPoint(L.latLng(A[0], A[1])), pb = map.latLngToLayerPoint(L.latLng(B[0], B[1]));
-          const hdg = (Math.atan2(pb.x - pa.x, -(pb.y - pa.y)) * 180 / Math.PI + 360) % 360;
+          const lineHdg = (Math.atan2(pb.x - pa.x, -(pb.y - pa.y)) * 180 / Math.PI + 360) % 360;
+          // the flight's own heading (degrees, 0 = north, clockwise) when it is live and fresh; otherwise along the line
+          const fh = f.live && f.live[2] !== null && f.live[2] !== undefined && f.live[2] !== "" ? Number(f.live[2]) : NaN;
+          const hdg = liveOk && isFinite(fh) && fh >= 0 && fh <= 360 ? fh : lineHdg;
           shown.push(A, B);
           sigs.push((f.keys || [])[0] || f.fl);
           L.polyline([A, pos], { color: color, weight: 3, opacity: 0.95, interactive: false }).addTo(grp);

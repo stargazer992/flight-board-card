@@ -882,20 +882,14 @@ th .sorth.on { color:var(--fg); }
     const W = 320, H = 150, R = Math.PI / 180;
     const a1 = A[0] * R, o1 = A[1] * R, a2 = B[0] * R, o2 = B[1] * R;
     const dd = 2 * Math.asin(Math.min(1, Math.sqrt(Math.sin((a2 - a1) / 2) ** 2 + Math.cos(a1) * Math.cos(a2) * Math.sin((o2 - o1) / 2) ** 2)));
-    // Point at fraction f along the great circle (lon unwrapped relative to the origin so the Pacific works)
-    const gc = f => {
-      if (dd < 1e-6) return [A[0], A[1]];
-      const k1 = Math.sin((1 - f) * dd) / Math.sin(dd), k2 = Math.sin(f * dd) / Math.sin(dd);
-      const x = k1 * Math.cos(a1) * Math.cos(o1) + k2 * Math.cos(a2) * Math.cos(o2), y = k1 * Math.cos(a1) * Math.sin(o1) + k2 * Math.cos(a2) * Math.sin(o2), z = k1 * Math.sin(a1) + k2 * Math.sin(a2);
-      let lon = Math.atan2(y, x) / R; const lat = Math.atan2(z, Math.sqrt(x * x + y * y)) / R;
-      while (lon - A[1] > 180) lon -= 360;
-      while (lon - A[1] < -180) lon += 360;
-      return [lat, lon];
-    };
+    // A simple straight line from A to B (not the real route); longitudes unwrapped so the Pacific works
+    let B1 = B[1];
+    while (B1 - A[1] > 180) B1 -= 360;
+    while (B1 - A[1] < -180) B1 += 360;
+    const gc = f => [A[0] + (B[0] - A[0]) * f, A[1] + (B1 - A[1]) * f];
     const N = 48, pts = [];
     for (let i = 0; i <= N; i++) pts.push(gc(i / N));
-    const lv = live ? [live[0], (() => { let l = live[1]; while (l - A[1] > 180) l -= 360; while (l - A[1] < -180) l += 360; return l; })()] : null;
-    const all = lv ? pts.concat([lv]) : pts;
+    const all = pts;
     let minLo = 1e9, maxLo = -1e9, minLa = 1e9, maxLa = -1e9;
     for (const q of all) { minLa = Math.min(minLa, q[0]); maxLa = Math.max(maxLa, q[0]); minLo = Math.min(minLo, q[1]); maxLo = Math.max(maxLo, q[1]); }
     const cx = (minLo + maxLo) / 2, cy = (minLa + maxLa) / 2, c = Math.max(0.2, Math.cos(cy * R));
@@ -908,11 +902,11 @@ th .sorth.on { color:var(--fg); }
     const k = Math.round(fr * N);
     const done = pp.slice(0, k + 1).map(q => f1(q[0]) + "," + f1(q[1])).join(" "), rest = pp.slice(k).map(q => f1(q[0]) + "," + f1(q[1])).join(" ");
     // Plane: the real position when known, else along the route by progress
-    let pl, ang;
-    if (lv) { pl = sc(lv); ang = live[2] !== null && live[2] !== undefined && isFinite(live[2]) ? live[2] : null; }
-    else pl = sc(gc(fr));
-    if (ang === null || ang === undefined) {
-      const q1 = sc(gc(Math.max(0, fr - 0.02))), q2 = sc(gc(Math.min(1, fr + 0.02)));
+    // Plane: on the straight line (by miles to go when live, else by time); it points along the flight's own heading when known
+    const pl = sc(gc(fr));
+    let ang = live && live[2] !== null && live[2] !== undefined && isFinite(live[2]) && live[2] >= 0 && live[2] <= 360 ? Number(live[2]) : null;
+    if (ang === null) {
+      const q1 = sc(gc(0)), q2 = sc(gc(1));
       ang = Math.atan2(q2[0] - q1[0], -(q2[1] - q1[1])) / R;   // 0 = up, clockwise
     }
     const pa = pp[0], pb = pp[N];
@@ -1035,8 +1029,12 @@ th .sorth.on { color:var(--fg); }
         const dep = rd || ed || sd, arrv = ra || ea || sa;
         let prog = 0;
         if (landed) prog = 1;
-        else if (dep && arrv && arrv > dep) prog = Math.max(0, Math.min(1, (now - dep) / (arrv - dep)));
         const live = pos && !pos.onGround && !landed ? [pos.lat, pos.lon, pos.hdg] : null;
+        if (!landed && live) {
+          // by miles: flown / (flown + still to go), from the live position
+          const d1 = this._nm(mA[0], mA[1], live[0], live[1]), d2 = this._nm(live[0], live[1], mB[0], mB[1]);
+          if (d1 + d2 > 0) prog = Math.max(0, Math.min(1, d1 / (d1 + d2)));
+        } else if (!landed && dep && arrv && arrv > dep) prog = Math.max(0, Math.min(1, (now - dep) / (arrv - dep)));
         const cap = landed ? "Landed" : live ? "Live position (" + E(pos.src) + ")" : (dep && now < dep) ? "Not departed yet" : "Approximate position: " + Math.round(prog * 100) + "% of the way, from the departure and arrival times";
         h += `<div class="pmap">${this._routeMap(mA, mB, prog, live, o.code, d.code)}<div class="pmcap">${cap}</div></div>`;
       }
@@ -1695,21 +1693,17 @@ th .sorth.on { color:var(--fg); }
     const dep = T("time_real_departure") || T("time_estimated_departure") || T("time_scheduled_departure");
     const arr = T("time_real_arrival") || T("time_estimated_arrival") || T("time_scheduled_arrival");
     const ra = T("time_real_arrival");
-    let live = null;
+    let live = null, spd = null, alt = null;
     if (lv && has(lv.latitude) && has(lv.longitude) && !(lv.on_ground !== undefined && Number(lv.on_ground) === 1)) live = [Number(lv.latitude), Number(lv.longitude), has(lv.heading) ? Number(lv.heading) : null];
     else if (sc && has(sc.os_latitude) && has(sc.os_longitude) && !sc.os_on_ground) live = [Number(sc.os_latitude), Number(sc.os_longitude), has(sc.os_heading) ? Number(sc.os_heading) : null];
-    // The track already flown (Flightradar24 "coordinates" = the real path so far), thinned to at most ~80 points
-    let trail = null;
-    if (lv && Array.isArray(lv.coordinates) && lv.coordinates.length > 1 && !(lv.on_ground !== undefined && Number(lv.on_ground) === 1)) {
-      const c = lv.coordinates.filter(q => Array.isArray(q) && isFinite(Number(q[0])) && isFinite(Number(q[1])));
-      const step = Math.max(1, Math.ceil(c.length / 80));
-      trail = [];
-      for (let i = 0; i < c.length; i += step) trail.push([Math.round(c[i][0] * 1000) / 1000, Math.round(c[i][1] * 1000) / 1000]);
-      const last = c[c.length - 1];
-      if (c.length > 1 && (c.length - 1) % step) trail.push([Math.round(last[0] * 1000) / 1000, Math.round(last[1] * 1000) / 1000]);
-      if (trail.length < 2) trail = null;
+    if (live) {
+      // speed (kt) and altitude (ft) for the map label
+      if (lv && has(lv.latitude)) { spd = has(lv.ground_speed) ? Number(lv.ground_speed) : null; alt = has(lv.altitude) ? Number(lv.altitude) : null; }
+      else { spd = has(sc.os_speed_ms) ? Number(sc.os_speed_ms) * 1.943844 : null; alt = has(sc.os_altitude_m) ? Number(sc.os_altitude_m) * 3.28084 : null; }
+      if (spd !== null && !isFinite(spd)) spd = null;
+      if (alt !== null && !isFinite(alt)) alt = null;
     }
-    return { fl: r.fl || (r.keys && r.keys[0]) || "", keys: r.keys || [], o: { k: oc || "", ll: a }, d: { k: dc || "", ll: b }, dep, arr, landed: !!ra || !!(lv && lv.has_landed), live, trail, t: Math.floor(Date.now() / 1000) };
+    return { fl: r.fl || (r.keys && r.keys[0]) || "", keys: r.keys || [], o: { k: oc || "", ll: a }, d: { k: dc || "", ll: b }, dep, arr, landed: !!ra || !!(lv && lv.has_landed), live, spd: spd === null ? null : Math.round(spd), alt: alt === null ? null : Math.round(alt), t: Math.floor(Date.now() / 1000) };
   }
   _publishGeo(found, all) {
     try {
@@ -1718,7 +1712,7 @@ th .sorth.on { color:var(--fg); }
       try { cur = JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { cur = {}; }
       const list = Array.isArray(cur.flights) ? cur.flights : [];
       const mine = [];
-      for (const r of found) { try { const e = this._trkGeo(r); if (e) { const old = list.find(x => (x.keys || []).some(y => (e.keys || []).indexOf(y) >= 0)); if (old && e.t - (old.t || 0) < 120 && JSON.stringify([old.live, old.landed, old.dep, old.arr, old.o, old.d, old.trail]) === JSON.stringify([e.live, e.landed, e.dep, e.arr, e.o, e.d, e.trail])) e.t = old.t; e.yaml = all.some(o => !o.extra && (r.keys || []).indexOf(o.code) >= 0); mine.push(e); } } catch (e) {} }
+      for (const r of found) { try { const e = this._trkGeo(r); if (e) { const old = list.find(x => (x.keys || []).some(y => (e.keys || []).indexOf(y) >= 0)); if (old && e.t - (old.t || 0) < 120 && JSON.stringify([old.live, old.landed, old.dep, old.arr, old.o, old.d, old.spd, old.alt]) === JSON.stringify([e.live, e.landed, e.dep, e.arr, e.o, e.d, e.spd, e.alt])) e.t = old.t; e.yaml = all.some(o => !o.extra && (r.keys || []).indexOf(o.code) >= 0); mine.push(e); } } catch (e) {} }
       const same = (a, b) => (a.keys || []).some(x => (b.keys || []).indexOf(x) >= 0);
       const out = list.filter(x => !mine.some(m => same(m, x)) && Date.now() / 1000 - (x.t || 0) < 6 * 3600);
       const txt = JSON.stringify({ flights: out.concat(mine) });

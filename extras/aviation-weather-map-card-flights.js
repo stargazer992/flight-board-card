@@ -43,8 +43,44 @@
       this._flHandler = null;
     }
     this._flGroup = null;
+    try { if (this._flHost) this._flHost.remove(); } catch (e) { /* ignore */ }
+    this._flHost = null;
     this._flSig = "";
     this._flFitted = false;
+  }
+
+  // Tap the plane: open the flight-board-card's details page for that flight. A hidden copy of the board card is kept
+  // inside this card (it works on any dashboard view); its pop-up is shown on top of the map.
+  _flOpen(f) {
+    const tag = customElements.get("flight-board-card-test") ? "flight-board-card-test" : "flight-board-card";
+    if (!customElements.get(tag) || !this.shadowRoot) return;
+    let h = this._flHost;
+    if (!h) {
+      h = document.createElement(tag);
+      h.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;overflow:visible;visibility:hidden;pointer-events:none;";
+      h.setConfig({ type: "custom:" + tag, show: "tracked" });
+      this.shadowRoot.appendChild(h);
+      this._flHost = h;
+    }
+    if (this._hass) h.hass = this._hass;
+    const keys = (f.keys || []).map((x) => String(x).toUpperCase());
+    let tries = 0;
+    const go = () => {
+      try {
+        const reg = h._rowReg || {};
+        for (const rk in reg) {
+          const r = reg[rk];
+          if (r && (r.keys || []).some((k) => keys.indexOf(String(k).toUpperCase()) >= 0)) {
+            h._openPopup(rk);
+            const pop = h.shadowRoot && h.shadowRoot.querySelector(".pop");
+            if (pop) { pop.style.visibility = "visible"; pop.style.pointerEvents = "auto"; }
+            return;
+          }
+        }
+        if (++tries < 20) setTimeout(go, 250);
+      } catch (e) { console.warn("aviation-weather-map-card: flight details failed", e); }
+    };
+    go();
   }
 
   _drawFlights() {
@@ -117,8 +153,15 @@
             zIndexOffset: 2000,
             keyboard: false,
           });
-          const what = how;
-          mk.bindTooltip("<b>" + String(f.fl || "").replace(/</g, "") + "</b> " + String(f.o.k || "") + " &rarr; " + String(f.d.k || "") + "<br>" + what, { direction: "top", offset: [0, -12] });
+          // label next to the plane: flight, speed, flight level, time to go  (e.g. AA3141, 450kts, FL360, 2:21 HR)
+          const parts = [String(f.fl || "").replace(/</g, "")];
+          if (liveOk && f.spd > 0) parts.push(Math.round(f.spd) + "kts");
+          if (liveOk && f.alt > 0) parts.push("FL" + String(Math.round(f.alt / 100)).padStart(3, "0"));
+          if (f.landed) parts.push("Landed");
+          else if (f.arr && f.arr > now) { const m = Math.round((f.arr - now) / 60); parts.push(Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") + " HR"); }
+          else if (!liveOk && how) parts.push(how);
+          mk.bindTooltip(parts.join(", "), { permanent: true, direction: "right", offset: [14, 0], className: "awm-fl-label" });
+          mk.on("click", () => { try { this._flOpen(f); } catch (e) { console.warn("aviation-weather-map-card: flight details failed", e); } });
           mk.addTo(grp);
         } catch (err) {
           console.warn("aviation-weather-map-card: could not draw a tracked flight", err);
@@ -140,7 +183,7 @@
   }
 
     }.prototype;
-    for (const k of ["_initFlights", "_teardownFlights", "_drawFlights"]) P[k] = cls[k];
+    for (const k of ["_initFlights", "_teardownFlights", "_drawFlights", "_flOpen"]) P[k] = cls[k];
     const origInit = P._initMap, origTear = P._teardown;
     P._initMap = function () {
       const r = origInit.apply(this, arguments);
@@ -213,6 +256,14 @@
       } catch (e) { /* ignore */ }
       return r;
     };
+    const hd = Object.getOwnPropertyDescriptor(P, "hass");
+    if (hd && hd.set) {
+      Object.defineProperty(P, "hass", {
+        configurable: true,
+        get: hd.get,
+        set: function (v) { hd.set.call(this, v); try { if (this._flHost) this._flHost.hass = v; } catch (e) { /* ignore */ } },
+      });
+    }
     const origRefit = P._refit;
     P._refit = function () {
       if (this._flFitted && !this._flManual && this._flSig) return;   // keep the zoomed-out view of the tracked flight(s)

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The pop-up route map is now a straight line A to B; the plane sits on it by miles to go (live) or by time, and points along the flight's own heading.
 - The card now saves the positions of tracked flights (`flight-board-card-geo` in this browser) so a map card can draw them. Used by the optional aviation-weather-map-card add-on.
 
 ## 1.10.0 (fork)

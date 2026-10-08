@@ -521,9 +521,10 @@ th .sorth.on { color:var(--fg); }
 .ch.s1 { animation: chs1 var(--stepms, 55ms) linear both; }
 .ch.s2 { animation: chs2 var(--stepms, 55ms) linear both; }
 /* Optional metallic highlight sweeping over a tile while it flips (flip_shine: true) */
-.board.shine .ch { position:relative; overflow:hidden; }
+.board.shine .ch { position:relative; overflow:hidden; background:linear-gradient(#3a3a3a 0 49%, #000 49% 51%, #2a2a2a 51% 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.6); }
+.board.shine .ch::before { content:""; position:absolute; left:0; right:0; top:0; height:49%; pointer-events:none; background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.04)); }
 .board.shine .ch.s1::after, .board.shine .ch.s2::after, .board.shine .ch.fl::after { content:""; position:absolute; left:0; right:0; top:0; height:100%; pointer-events:none;
-  background:linear-gradient(180deg, rgba(255,255,255,0) 20%, rgba(255,255,255,.42) 48%, rgba(255,255,255,.12) 56%, rgba(255,255,255,0) 80%); animation: chshine var(--stepms, 55ms) linear both; }
+  background:linear-gradient(180deg, rgba(255,255,255,0) 20%, rgba(255,255,255,.8) 48%, rgba(255,255,255,.25) 56%, rgba(255,255,255,0) 80%); animation: chshine var(--stepms, 55ms) linear both; }
 .board.shine .ch.fl::after { animation-duration:.5s; }
 @keyframes chshine { 0% { transform:translateY(-70%); opacity:0 } 50% { opacity:1 } 100% { transform:translateY(70%); opacity:0 } }
 @keyframes chs1 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }

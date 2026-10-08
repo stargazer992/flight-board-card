@@ -148,7 +148,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `flip_on_load` | `true` | Spin every tile in from blank on first load |
 | `flip_step_ms` | `55` | Milliseconds per character step (higher = slower) |
 | `flip_max_steps` | `24` | Most characters a tile scrolls through before settling (lower = faster) |
-| `flip_shine` | `true` | Split-flap style: a metallic highlight sweeps over each tile as it flips |
+| `flip_shine` | `true` | Split-flap style: metallic gloss on every tile |
 | `flip_sound` | `false` | Play a real split-flap clatter once per board refresh, as long as the flipping lasts. Browsers only allow sound after you tap or click the page once |
 | `flip_sound_toggle` | `true` | Show a small Flip sound on / off button at the bottom of the card. Its setting is remembered in the browser and overrides `flip_sound` |
 | `flip_sound_volume` | `0.8` | Volume of the clatter, 0 to 1 (a refresh that changes only a few tiles is played quieter automatically) |

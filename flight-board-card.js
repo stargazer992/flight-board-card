@@ -518,17 +518,12 @@ th .sorth.on { color:var(--fg); }
   box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.6); }
 .ch.fl { animation: chflip .5s ease-in both; }
 @keyframes chflip { 0% { transform:rotateX(0) } 40% { transform:rotateX(90deg); filter:brightness(.4) } 100% { transform:rotateX(0) } }
-.ch.s1 { animation: chs1 var(--stepms, 55ms) linear both; }
-.ch.s2 { animation: chs2 var(--stepms, 55ms) linear both; }
-/* Optional metallic highlight sweeping over a tile while it flips (flip_shine: true) */
-.board.shine .ch { position:relative; overflow:hidden; background:linear-gradient(#3a3a3a 0 49%, #000 49% 51%, #2a2a2a 51% 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.6); }
-.board.shine .ch::before { content:""; position:absolute; left:0; right:0; top:0; height:49%; pointer-events:none; background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.04)); }
-.board.shine .ch.s1::after, .board.shine .ch.s2::after, .board.shine .ch.fl::after { content:""; position:absolute; left:0; right:0; top:0; height:100%; pointer-events:none;
-  background:linear-gradient(180deg, rgba(255,255,255,0) 20%, rgba(255,255,255,.8) 48%, rgba(255,255,255,.25) 56%, rgba(255,255,255,0) 80%); animation: chshine var(--stepms, 55ms) linear both; }
-.board.shine .ch.fl::after { animation-duration:.5s; }
-@keyframes chshine { 0% { transform:translateY(-70%); opacity:0 } 50% { opacity:1 } 100% { transform:translateY(70%); opacity:0 } }
-@keyframes chs1 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }
-@keyframes chs2 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25); filter:brightness(.65) } 100% { transform:scaleY(1) } }
+.ch.s1 { animation: chs1 var(--stepms, 55ms) linear both; will-change:transform; }
+.ch.s2 { animation: chs2 var(--stepms, 55ms) linear both; will-change:transform; }
+/* Optional metallic gloss (flip_shine: true). Painted with background layers only (no pseudo-elements, no per-flip extra animation) so hundreds of tiles can still flip smoothly. */
+.board.shine .ch { background:linear-gradient(180deg, rgba(255,255,255,.2) 0, rgba(255,255,255,.04) 49%, rgba(0,0,0,0) 49%), linear-gradient(#3a3a3a 0 49%, #000 49% 51%, #2a2a2a 51% 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.6); }
+@keyframes chs1 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25) } 100% { transform:scaleY(1) } }
+@keyframes chs2 { 0% { transform:scaleY(1) } 50% { transform:scaleY(.25) } 100% { transform:scaleY(1) } }
 .board.splitflap .clock { font-size:var(--fs); letter-spacing:0; }
 .board.splitflap .clock .ch { width:.76em; }
 
@@ -2025,6 +2020,8 @@ th .sorth.on { color:var(--fg); }
     const step = Math.max(25, Number(this._config.flip_step_ms) || 55);
     let cap = Math.max(4, Number(this._config.flip_max_steps) || 24);
     if (els.length > 150) cap = Math.min(cap, 12);
+    if (els.length > 500) cap = Math.min(cap, 7);
+    else if (els.length > 300) cap = Math.min(cap, 9);
     this._stepMs = step;
     const board = root.querySelector(".board");
     if (board) board.style.setProperty("--stepms", step + "ms");

@@ -3,7 +3,7 @@
  * Adds a "tracked flights" layer to aviation-weather-map-card: route line, plane and airport labels for the flights
  * tracked on the flight-board-card (same browser). Options (in the weather card YAML, all optional):
  *   show_tracked_flights: true | flight_color: "#ffd600" | flight_refresh_seconds: 20
- *   flight_live_max_age: 600 | flight_remove_after_hours: 2
+ *   flight_live_max_age: 600 | flight_fix_stale_seconds: 300 | flight_remove_after_hours: 2
  */
 (function () {
   const wait = (n) => {
@@ -106,6 +106,27 @@
     go();
   }
 
+  // When was this flight's position last updated by the data source? (seconds, or 0 if unknown)
+  _flFixTime(f) {
+    try {
+      const st = this._hass && this._hass.states;
+      if (!st) return 0;
+      const keys = (f.keys || []).map((x) => String(x).toUpperCase().replace(/[^A-Z0-9]/g, ""));
+      for (const id in st) {
+        const fl = st[id] && st[id].attributes && st[id].attributes.flights;
+        if (!Array.isArray(fl)) continue;
+        for (const x of fl) {
+          const fn = String((x && x.flight_number) || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+          if (fn && keys.indexOf(fn) >= 0) {
+            const t = Number(x.details_updated_at);
+            if (isFinite(t) && t > 0) return t;
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return 0;
+  }
+
   _drawFlights() {
     try {
       const L = this._L, map = this._map, grp = this._flGroup;
@@ -140,14 +161,26 @@
             return 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
           };
           const liveOk = f.live && !f.landed && now - (f.t || 0) <= (Number(cfg.flight_live_max_age) || 600);
-          let prog = 0, how = "";
+          let prog = 0, how = "", estPos = false;
           if (f.landed) { prog = 1; how = "Landed"; }
           else if (liveOk) {
             // by distance: miles flown / (miles flown + miles to go), from the live position
-            const lp = [f.live[0], f.live[1]];
+            let lp = [f.live[0], f.live[1]];
+            // The saved position can be much older than the saved record (the data source may stop updating a flight
+            // while the estimated arrival keeps counting down). If the last real fix is old, move the plane from that fix
+            // toward the destination in step with the arrival estimate, so it matches the "time to go" label.
+            const fixT = this._flFixTime(f), staleS = Number(cfg.flight_fix_stale_seconds) || 300;
+            if (fixT && now - fixT > staleS && f.arr && f.arr > fixT) {
+              const frac = Math.max(0, Math.min(1, (now - fixT) / (f.arr - fixT)));
+              let lo = lp[1];
+              while (lo - B[1] > 180) lo -= 360;
+              while (lo - B[1] < -180) lo += 360;
+              lp = [lp[0] + (B[0] - lp[0]) * frac, lo + (B[1] - lo) * frac];
+              estPos = true;
+            }
             const d1 = nm(A, lp), d2 = nm(lp, f.d.ll);
             prog = d1 + d2 > 0 ? Math.max(0, Math.min(1, d1 / (d1 + d2))) : 0;
-            how = "Live: " + Math.round(d2).toLocaleString("en-US") + " nm to go";
+            how = (estPos ? "Est.: " : "Live: ") + Math.round(d2).toLocaleString("en-US") + " nm to go";
           } else if (f.dep && f.arr && f.arr > f.dep) {
             // by time: share of the scheduled / estimated flight time that has passed
             prog = Math.max(0, Math.min(1, (now - f.dep) / (f.arr - f.dep)));
@@ -159,7 +192,7 @@
           const lineHdg = (Math.atan2(pb.x - pa.x, -(pb.y - pa.y)) * 180 / Math.PI + 360) % 360;
           // the flight's own heading (degrees, 0 = north, clockwise) when it is live and fresh; otherwise along the line
           const fh = f.live && f.live[2] !== null && f.live[2] !== undefined && f.live[2] !== "" ? Number(f.live[2]) : NaN;
-          const hdg = liveOk && isFinite(fh) && fh >= 0 && fh <= 360 ? fh : lineHdg;
+          const hdg = liveOk && isFinite(fh) && fh >= 0 && fh <= 360 ? fh : lineHdg;   // (an estimated position keeps the last real heading)
           shown.push(A, B);
           sigs.push((f.keys || [])[0] || f.fl);
           L.polyline([A, pos], { color: color, weight: 3, opacity: 0.95, interactive: false }).addTo(grp);
@@ -181,6 +214,7 @@
           const parts = [String(f.fl || "").replace(/</g, "")];
           if (liveOk && f.spd > 0) parts.push(Math.round(f.spd) + "kts");
           if (liveOk && f.alt > 0) parts.push("FL" + String(Math.round(f.alt / 100)).padStart(3, "0"));
+          if (estPos) parts.push("est. position");
           if (f.landed) parts.push("Landed");
           else if (f.arr && f.arr > now) { const m = Math.round((f.arr - now) / 60); parts.push(Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") + " HR"); }
           else if (!liveOk && how) parts.push(how);
@@ -208,7 +242,7 @@
   }
 
     }.prototype;
-    for (const k of ["_initFlights", "_teardownFlights", "_drawFlights", "_flOpen", "_flCenter"]) P[k] = cls[k];
+    for (const k of ["_initFlights", "_teardownFlights", "_drawFlights", "_flOpen", "_flCenter", "_flFixTime"]) P[k] = cls[k];
     const origInit = P._initMap, origTear = P._teardown;
     P._initMap = function () {
       const r = origInit.apply(this, arguments);

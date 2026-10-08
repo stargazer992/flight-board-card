@@ -50,6 +50,7 @@
       const L = this._L, map = this._map, grp = this._flGroup;
       if (!L || !map || !grp) return;
       grp.clearLayers();
+      if (this._flOff) return;
       let geo = [], tracked = [];
       for (const p of ["flight-board-card", "flight-board-card-test"]) {
         try { geo = geo.concat((JSON.parse(localStorage.getItem(p + "-geo") || "{}") || {}).flights || []); } catch (e) { /* ignore */ }
@@ -105,10 +106,37 @@
             const i = Math.min(63, Math.round(prog * 64)), a = pts[i], b = pts[i + 1] || pts[i];
             hdg = (Math.atan2((b[1] - a[1]) * Math.cos(a[0] * rad), b[0] - a[0]) / rad + 360) % 360;
           }
-          // route: solid up to the plane, dashed for the rest
+          // route: solid = where it has been, dashed = projected rest of the way
           let cut = 0;
           for (let i = 0; i < pts.length; i++) if (i / 64 <= prog) cut = i;
-          const done = pts.slice(0, cut + 1).concat([pos]), rest = [pos].concat(pts.slice(cut + 1));
+          let done = pts.slice(0, cut + 1).concat([pos]), rest = [pos].concat(pts.slice(cut + 1)), trackNote = "";
+          const tr = Array.isArray(f.trail) && f.trail.length > 1 && !f.landed ? f.trail : null;
+          if (tr) {
+            // the real track flown so far (Flightradar24), longitudes unwrapped; the plane sits at its end
+            const real = [];
+            let pl = tr[0][1];
+            for (const q of tr) { let lo = q[1]; while (lo - pl > 180) lo -= 360; while (lo - pl < -180) lo += 360; pl = lo; real.push([q[0], lo]); }
+            const end = real[real.length - 1];
+            pos = [end[0], end[1]];
+            const a2 = real[real.length - 2];
+            hdg = (Math.atan2((end[1] - a2[1]) * Math.cos(end[0] * rad), end[0] - a2[0]) / rad + 360) % 360;
+            // projected rest: great circle from the plane to the destination
+            const q1 = end[0] * rad, m1 = end[1] * rad, q2 = B[0] * rad;
+            let m2 = B[1];
+            while (m2 - end[1] > 180) m2 -= 360; while (m2 - end[1] < -180) m2 += 360;
+            m2 *= rad;
+            const d2 = 2 * Math.asin(Math.min(1, Math.sqrt(Math.sin((q2 - q1) / 2) ** 2 + Math.cos(q1) * Math.cos(q2) * Math.sin((m2 - m1) / 2) ** 2)));
+            rest = [[end[0], end[1]]];
+            if (d2 > 1e-6) for (let i = 1; i <= 48; i++) {
+              const fr = i / 48, a = Math.sin((1 - fr) * d2) / Math.sin(d2), b = Math.sin(fr * d2) / Math.sin(d2);
+              const x = a * Math.cos(q1) * Math.cos(m1) + b * Math.cos(q2) * Math.cos(m2), y = a * Math.cos(q1) * Math.sin(m1) + b * Math.cos(q2) * Math.sin(m2), z = a * Math.sin(q1) + b * Math.sin(q2);
+              rest.push([Math.atan2(z, Math.sqrt(x * x + y * y)) / rad, Math.atan2(y, x) / rad]);
+            }
+            done = real;
+            // Flightradar24 only keeps the recent part of the track: join the departure airport to its start with a thin line
+            L.polyline([[A[0], real[0][1] > A[1] + 180 ? A[1] + 360 : real[0][1] < A[1] - 180 ? A[1] - 360 : A[1]], real[0]], { color: color, weight: 2, opacity: 0.45, interactive: false }).addTo(grp);
+            trackNote = "Real track flown";
+          }
           L.polyline(done, { color: color, weight: 3, opacity: 0.95, interactive: false }).addTo(grp);
           L.polyline(rest, { color: color, weight: 2, opacity: 0.8, dashArray: "6 7", interactive: false }).addTo(grp);
           // airport labels
@@ -124,7 +152,8 @@
             zIndexOffset: 2000,
             keyboard: false,
           });
-          const what = f.landed ? "Landed" : liveOk ? "Live position" : prog <= 0 ? "Not departed yet" : "Approx. " + Math.round(prog * 100) + "% of the way";
+          const age = Math.max(0, Math.round((now - (f.t || now)) / 60));
+          const what = f.landed ? "Landed" : trackNote ? trackNote + (age > 10 ? " (last update " + age + " min ago)" : "") : liveOk ? "Live position" : prog <= 0 ? "Not departed yet" : "Approx. " + Math.round(prog * 100) + "% of the way";
           mk.bindTooltip("<b>" + String(f.fl || "").replace(/</g, "") + "</b> " + String(f.o.k || "") + " &rarr; " + String(f.d.k || "") + "<br>" + what, { direction: "top", offset: [0, -12] });
           mk.addTo(grp);
         } catch (err) {
@@ -152,6 +181,58 @@
         if (this._cfg && this._cfg.show_tracked_flights === undefined) this._cfg.show_tracked_flights = true;
         this._initFlights();
       } catch (e) { console.warn("aviation-weather-map-card flights add-on:", e); }
+      return r;
+    };
+    // Menu: a Flights button in the bottom bar and a row in the legend switch the layer on / off (remembered in this browser)
+    const KEY = "awm-flights-off";
+    const count = (self) => { try { return self._flGroup ? self._flGroup.getLayers().filter((l) => l.options && l.options.zIndexOffset === 2000).length : 0; } catch (e) { return 0; } };
+    const setOff = (self, off) => {
+      self._flOff = off;
+      try { localStorage.setItem(KEY, off ? "1" : "0"); } catch (e) { /* ignore */ }
+      self._drawFlights();
+      const b = self.shadowRoot && self.shadowRoot.querySelector(".bar [data-bar=flights]");
+      if (b) b.classList.toggle("on", !off);
+      const r = self.shadowRoot && self.shadowRoot.querySelector(".legend .row[data-flights]");
+      if (r) r.classList.toggle("off", off);
+    };
+    const origLegend = P._renderLegend;
+    P._renderLegend = function () {
+      const r = origLegend.apply(this, arguments);
+      try {
+        const legend = this.shadowRoot && this.shadowRoot.querySelector(".legend");
+        if (legend && this._cfg && this._cfg.show_tracked_flights !== false) {
+          const row = document.createElement("div");
+          row.className = "row" + (this._flOff ? " off" : "");
+          row.setAttribute("data-flights", "1");
+          row.innerHTML = '<span class="dot star">\u2708</span><span>Tracked flights</span><span class="count">' + count(this) + "</span>";
+          row.addEventListener("click", () => setOff(this, !this._flOff));
+          const h = document.createElement("div");
+          h.className = "subhead";
+          h.textContent = "Flights";
+          legend.appendChild(h);
+          legend.appendChild(row);
+        }
+      } catch (e) { /* ignore */ }
+      return r;
+    };
+    const origFlInit = P._initFlights;
+    P._initFlights = function () {
+      try { if (this._flOff === undefined) this._flOff = localStorage.getItem(KEY) === "1"; } catch (e) { this._flOff = false; }
+      const r = origFlInit.apply(this, arguments);
+      try {
+        const bar = this.shadowRoot && this.shadowRoot.querySelector(".bar");
+        if (bar && this._cfg && this._cfg.show_tracked_flights !== false && !bar.querySelector("[data-flights-btn]")) {
+          const btn = document.createElement("button");
+          btn.setAttribute("data-bar", "flights");
+          btn.setAttribute("data-flights-btn", "1");
+          btn.title = "Show / hide the tracked flights";
+          btn.textContent = "\u2708 Flights";
+          if (!this._flOff) btn.classList.add("on");
+          btn.addEventListener("click", () => setOff(this, !this._flOff));
+          bar.appendChild(btn);
+        }
+        this._renderLegend();
+      } catch (e) { /* ignore */ }
       return r;
     };
     P._teardown = function () {

@@ -1698,7 +1698,18 @@ th .sorth.on { color:var(--fg); }
     let live = null;
     if (lv && has(lv.latitude) && has(lv.longitude) && !(lv.on_ground !== undefined && Number(lv.on_ground) === 1)) live = [Number(lv.latitude), Number(lv.longitude), has(lv.heading) ? Number(lv.heading) : null];
     else if (sc && has(sc.os_latitude) && has(sc.os_longitude) && !sc.os_on_ground) live = [Number(sc.os_latitude), Number(sc.os_longitude), has(sc.os_heading) ? Number(sc.os_heading) : null];
-    return { fl: r.fl || (r.keys && r.keys[0]) || "", keys: r.keys || [], o: { k: oc || "", ll: a }, d: { k: dc || "", ll: b }, dep, arr, landed: !!ra || !!(lv && lv.has_landed), live, t: Math.floor(Date.now() / 1000) };
+    // The track already flown (Flightradar24 "coordinates" = the real path so far), thinned to at most ~80 points
+    let trail = null;
+    if (lv && Array.isArray(lv.coordinates) && lv.coordinates.length > 1 && !(lv.on_ground !== undefined && Number(lv.on_ground) === 1)) {
+      const c = lv.coordinates.filter(q => Array.isArray(q) && isFinite(Number(q[0])) && isFinite(Number(q[1])));
+      const step = Math.max(1, Math.ceil(c.length / 80));
+      trail = [];
+      for (let i = 0; i < c.length; i += step) trail.push([Math.round(c[i][0] * 1000) / 1000, Math.round(c[i][1] * 1000) / 1000]);
+      const last = c[c.length - 1];
+      if (c.length > 1 && (c.length - 1) % step) trail.push([Math.round(last[0] * 1000) / 1000, Math.round(last[1] * 1000) / 1000]);
+      if (trail.length < 2) trail = null;
+    }
+    return { fl: r.fl || (r.keys && r.keys[0]) || "", keys: r.keys || [], o: { k: oc || "", ll: a }, d: { k: dc || "", ll: b }, dep, arr, landed: !!ra || !!(lv && lv.has_landed), live, trail, t: Math.floor(Date.now() / 1000) };
   }
   _publishGeo(found, all) {
     try {
@@ -1707,7 +1718,7 @@ th .sorth.on { color:var(--fg); }
       try { cur = JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { cur = {}; }
       const list = Array.isArray(cur.flights) ? cur.flights : [];
       const mine = [];
-      for (const r of found) { try { const e = this._trkGeo(r); if (e) { const old = list.find(x => (x.keys || []).some(y => (e.keys || []).indexOf(y) >= 0)); if (old && e.t - (old.t || 0) < 120 && JSON.stringify([old.live, old.landed, old.dep, old.arr, old.o, old.d]) === JSON.stringify([e.live, e.landed, e.dep, e.arr, e.o, e.d])) e.t = old.t; e.yaml = all.some(o => !o.extra && (r.keys || []).indexOf(o.code) >= 0); mine.push(e); } } catch (e) {} }
+      for (const r of found) { try { const e = this._trkGeo(r); if (e) { const old = list.find(x => (x.keys || []).some(y => (e.keys || []).indexOf(y) >= 0)); if (old && e.t - (old.t || 0) < 120 && JSON.stringify([old.live, old.landed, old.dep, old.arr, old.o, old.d, old.trail]) === JSON.stringify([e.live, e.landed, e.dep, e.arr, e.o, e.d, e.trail])) e.t = old.t; e.yaml = all.some(o => !o.extra && (r.keys || []).indexOf(o.code) >= 0); mine.push(e); } } catch (e) {} }
       const same = (a, b) => (a.keys || []).some(x => (b.keys || []).indexOf(x) >= 0);
       const out = list.filter(x => !mine.some(m => same(m, x)) && Date.now() / 1000 - (x.t || 0) < 6 * 3600);
       const txt = JSON.stringify({ flights: out.concat(mine) });

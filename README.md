@@ -148,6 +148,7 @@ The board looks best on its own dashboard view with the **Panel (single card)** 
 | `flip_on_load` | `true` | Spin every tile in from blank on first load |
 | `flip_step_ms` | `55` | Milliseconds per character step (higher = slower) |
 | `flip_max_steps` | `24` | Most characters a tile scrolls through before settling (lower = faster) |
+| `delay_minutes` | `15` | Minutes late before a flight shows DELAYED. The card first removes the near-constant 17 to 20 minute padding Flightradar24 puts on the estimated departure of most flights, so only real delays turn amber |
 | `flip_sound` | `false` | Play a real split-flap clatter once per board refresh, as long as the flipping lasts. Browsers only allow sound after you tap or click the page once |
 | `flip_sound_toggle` | `true` | Show a small Flip sound on / off button at the bottom of the card. Its setting is remembered in the browser and overrides `flip_sound` |
 | `flip_sound_volume` | `0.8` | Volume of the clatter, 0 to 1 (a refresh that changes only a few tiles is played quieter automatically) |

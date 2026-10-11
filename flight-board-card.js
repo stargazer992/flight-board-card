@@ -83,6 +83,7 @@ const FBC_DEFAULTS = {
   gates_entity: "sensor.flight_board_gates", full_board_entity: "sensor.flight_board_full",
   // Raleigh style: your own airline logo images, e.g. { AA: "/local/logos/aa.png", DL: "/local/logos/dl.png" }. Without one the airline name is shown as text
   airline_logos: {},
+  delay_minutes: 15,
   flip_cycle: true, flip_on_load: true, flip_step_ms: 55, flip_max_steps: 24,
   // Split-flap clatter (one real recording, built into the card). Off by default: browsers only allow sound after you have tapped or clicked the page once
   flip_sound: false, flip_sound_toggle: true, flip_sound_volume: 0.8,
@@ -1322,6 +1323,26 @@ th .sorth.on { color:var(--fg); }
     return this._h12() ? ((hh % 12) || 12) + ":" + m[2] + (hh < 12 ? " AM" : " PM") : String(hh).padStart(2, "0") + ":" + m[2];
   }
   _compact(t) { return String(t).replace(" AM", "A").replace(" PM", "P"); }
+  // Minutes a flight must be late (after removing the feed's usual offset) to be called DELAYED
+  _delayMin() { const n = Number(this._config.delay_minutes); return n > 0 ? n : 15; }
+  // Flightradar24 pads the estimated departure of most flights that have not left yet by a near-constant 17 to 20 min, which is not a real delay.
+  // Learn that offset from the board itself (the most common estimated-minus-scheduled value of 5 min or more) and ignore it. Seconds; 0 when there is no clear pattern.
+  _offs(kind) { return kind === "dep" ? (this._depOff || 0) : 0; }
+  _learnOff(list) {
+    this._depOff = 0;
+    try {
+      const bins = {}; let n = 0;
+      for (const f of list) {
+        if (!f || f.time_real_departure || !f.time_estimated_departure || !f.time_scheduled_departure) continue;
+        n++;
+        const m = Math.round((f.time_estimated_departure - f.time_scheduled_departure) / 60);
+        if (m >= 5 && m <= 40) bins[m] = (bins[m] || 0) + 1;
+      }
+      let best = 0, bm = 0;
+      for (let m = 5; m <= 40; m++) { const c = (bins[m - 1] || 0) + (bins[m] || 0) + (bins[m + 1] || 0); if (c > best) { best = c; bm = m; } }
+      if (n >= 8 && best >= Math.max(6, n * 0.25)) this._depOff = bm * 60;
+    } catch (e) {}
+  }
   _status(f, kind) {
     const st = String(f.status || "").toLowerCase(), txt = String(f.status_text || "").trim();
     const sched = kind === "dep" ? f.time_scheduled_departure : f.time_scheduled_arrival;
@@ -1333,9 +1354,10 @@ th .sorth.on { color:var(--fg); }
     if (/landed/i.test(txt)) return [("LANDED " + this._txtTime(txt)).trim(), "ok"];
     if (/departed/i.test(txt)) return [("DEPARTED " + this._txtTime(txt)).trim(), "ok"];
     if (/board/i.test(txt) || /board/.test(st)) return ["BOARDING", "board"];
-    if (est && sched && est - sched >= 15 * 60) return ["DELAYED " + this._fmt(est), "warn"];
+    const adj = est && sched ? est - sched - this._offs(kind) : 0;   // minutes late once the feed's usual estimate offset is removed
+    if (est && sched && adj >= this._delayMin() * 60) return ["DELAYED " + this._fmt(est), "warn"];
     if (/delay/i.test(txt) || /delay/.test(st)) return [("DELAYED " + this._txtTime(txt)).trim(), "warn"];
-    if (est && sched && est !== sched) return ["EXPECTED " + this._fmt(est), ""];
+    if (est && sched && est !== sched && Math.abs(adj) >= 300) return ["EXPECTED " + this._fmt(est), ""];
     if (est) return ["ON TIME", ""];
     return ["SCHEDULED", ""];
   }
@@ -1358,6 +1380,7 @@ th .sorth.on { color:var(--fg); }
         if (add.length) base = base.concat(add);
       }
     } catch (e) {}
+    if (kind === "dep") this._learnOff(base);
     const keep = Date.now() / 1000 - (Number(this._config.past_minutes) || 0) * 60;
     const key = kind === "dep" ? "time_scheduled_departure" : "time_scheduled_arrival";
     const rkey = kind === "dep" ? "time_real_departure" : "time_real_arrival";
@@ -1577,9 +1600,9 @@ th .sorth.on { color:var(--fg); }
     else if (air) {
       ts = ea || sa;
       s = ea ? "ETA " + this._fmt(ea, lz) : "AIRBORNE";
-      if (ea && sa && ea - sa >= 900) { s = "DELAYED " + this._fmt(ea, lz); cls = "warn"; }
+      if (ea && sa && ea - sa >= this._delayMin() * 60) { s = "DELAYED " + this._fmt(ea, lz); cls = "warn"; }
     } else if (rd) { s = "DEPARTED " + this._fmt(rd); cls = "ok"; ts = ea || sa || rd; }
-    else if (ed && sd && ed !== sd) { const late = ed - sd >= 900; s = (late ? "DELAYED " : "EXPECTED ") + this._fmt(ed); cls = late ? "warn" : ""; }
+    else if (ed && sd && ed !== sd) { const late = ed - sd - (this._depOff || 0) >= this._delayMin() * 60; s = (late ? "DELAYED " : "EXPECTED ") + this._fmt(ed); cls = late ? "warn" : ""; }
     // Not airborne and leaving on another day: show the date instead of a time-only status
     if (!air && !landed && !rd) { const tag = this._dayTag(ts); if (tag) { s = "SCHED " + tag; cls = ""; } }
     let al = String(f.airline_short || f.airline || "");
@@ -2164,7 +2187,7 @@ th .sorth.on { color:var(--fg); }
     if (/cancel/.test(stx)) { st = "CANCELLED"; cls = "bad"; }
     else if (/divert/.test(stx)) { st = "DIVERTED"; cls = "bad"; }
     else if (landed) { st = "LANDED"; cls = "ok"; }
-    else if (ea && sa && ea - sa >= 900) { st = "DELAYED"; cls = "warn"; }
+    else if (ea && sa && ea - sa >= this._delayMin() * 60) { st = "DELAYED"; cls = "warn"; }
     else if (ea && sa && sa - ea >= 600) { st = "EARLY"; cls = "ok"; }
     else st = "ON TIME";
     // Arriving on another day (destination time): add the date
@@ -2370,7 +2393,7 @@ const FBC_LABELS = {
   city_codes: "Raleigh style: show airport codes (ATL) instead of city names when they do not fit",
   show_rows_selector: "Show the rows dropdown on the card (rows and time window adjust to each other)", max_rows: "Most rows shown in auto mode", hide_private: "Hide private and charter flights",
   flip_cycle: "Split-flap: letters cycle before settling", flip_on_load: "Split-flap: spin in when the board loads",
-  flip_step_ms: "Split-flap: milliseconds per flip", flip_sound: "Split-flap: clatter sound on by default (the button on the card overrides it)", flip_sound_toggle: "Show the Flip sound on / off button on the card", flip_sound_volume: "Split-flap: sound volume (0 to 1)", flip_max_steps: "Split-flap: most flips per character", title: "Title (leave empty for the airport name)",
+  delay_minutes: "Minutes late before a flight shows DELAYED (the feed's usual estimate padding is removed first)", flip_step_ms: "Split-flap: milliseconds per flip", flip_sound: "Split-flap: clatter sound on by default (the button on the card overrides it)", flip_sound_toggle: "Show the Flip sound on / off button on the card", flip_sound_volume: "Split-flap: sound volume (0 to 1)", flip_max_steps: "Split-flap: most flips per character", title: "Title (leave empty for the airport name)",
   departures_entity: "Departures sensor", arrivals_entity: "Arrivals sensor", airport_entity: "Tracked airport entity",
 };
 const FBC_SCHEMA = [
@@ -2410,6 +2433,7 @@ const FBC_SCHEMA = [
   { name: "flip_sound_toggle", selector: { boolean: {} } },
   { name: "flip_sound_volume", selector: { number: { min: 0, max: 1, step: 0.05, mode: "slider" } } },
   { type: "grid", name: "", schema: [
+    { name: "delay_minutes", selector: { number: { min: 5, max: 120, step: 5, mode: "box" } } },
     { name: "flip_step_ms", selector: { number: { min: 25, max: 150, step: 5, mode: "box" } } },
     { name: "flip_max_steps", selector: { number: { min: 4, max: 40, step: 1, mode: "box" } } },
   ] },

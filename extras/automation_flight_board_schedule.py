@@ -88,6 +88,13 @@ FR24_BOARD_URL = "https://api.flightradar24.com/common/v1/airport.json?code={cod
 # Entity that holds the airport the card shows (Flightradar24 integration)
 HOME_AIRPORT_ENTITY = "text.flightradar24_airport_track"
 BOARD_CACHE_SECONDS = 600
+# When Flightradar24 times out or refuses (it is an unofficial endpoint and throttles),
+# stop asking for a while instead of retrying every minute, and keep showing the last
+# good board. The wait doubles after each failure: BASE, 2x, 4x ... up to MAX.
+# Boards older than BOARD_STALE_MAX_SECONDS are no longer shown.
+BOARD_BACKOFF_BASE_SECONDS = 300
+BOARD_BACKOFF_MAX_SECONDS = 3600
+BOARD_STALE_MAX_SECONDS = 6 * 3600
 
 # FULL BOARD (more hours than the integration lists)
 # The Flightradar24 integration only lists the NEXT 50 flights per direction (about 3
@@ -197,6 +204,8 @@ SCHEDULE_STATE = {
     "avs_cache": {},   # code -> {"at": ts, "fields": dict}  (filled only by a card click)
     "trail_cache": {}, # code -> {"at": ts, "data": dict or None}
     "avs_usage": {"month": "", "count": 0, "logged": False},
+    "board_fails": 0,   # consecutive Flightradar24 board failures
+    "board_block_until": 0,   # no Flightradar24 requests before this time (backoff)
     "board_cache": {}, # "airport|mode" -> {"at": ts, "items": {flight number: [entries]}}
     "watch": {},       # code -> expiry timestamp (asked by the card)
     "token": {"value": "", "expires": 0},
@@ -370,6 +379,9 @@ def fb_sched_add_details(leg):
     # Nothing to add when both gates are already known
     if leg.get("airport_origin_gate") and leg.get("airport_destination_gate"):
         return
+    # Same provider as the board: stay quiet while it is backing off
+    if time.time() < SCHEDULE_STATE["board_block_until"]:
+        return
     try:
         payload = fb_sched_http_json(FR24_DETAIL_URL.replace("{flight_id}", str(flight_id)))
         for side in ["origin", "destination"]:
@@ -390,6 +402,11 @@ def fb_sched_board(code, mode):
     entry = cache.get(key)
     if entry is not None and now - entry["at"] < BOARD_CACHE_SECONDS:
         return entry["items"]
+    # Backing off after failures: serve the last good board (if not too old) and do not ask again yet
+    if now < SCHEDULE_STATE["board_block_until"]:
+        if entry is not None and now - entry["at"] < BOARD_STALE_MAX_SECONDS:
+            return entry["items"]
+        raise Exception("Flightradar24 board unavailable, waiting before the next try")
     rows = []
     pages = FULL_BOARD_PAGES if FULL_BOARD_ENABLED else 1
     if pages < 1:
@@ -402,6 +419,15 @@ def fb_sched_board(code, mode):
             payload = fb_sched_http_json(url)
         except Exception as e:
             if page == 1:
+                # Start (or lengthen) the backoff, then fall back to the last good board
+                SCHEDULE_STATE["board_fails"] = SCHEDULE_STATE["board_fails"] + 1
+                wait = BOARD_BACKOFF_BASE_SECONDS * (2 ** min(SCHEDULE_STATE["board_fails"] - 1, 6))
+                if wait > BOARD_BACKOFF_MAX_SECONDS:
+                    wait = BOARD_BACKOFF_MAX_SECONDS
+                SCHEDULE_STATE["board_block_until"] = now + wait
+                log.warning(f"{LOG_PREFIX}: airport board ({mode}) failed: {e}. Not asking again for {int(wait / 60)} min, showing the last good board")
+                if entry is not None and now - entry["at"] < BOARD_STALE_MAX_SECONDS:
+                    return entry["items"]
                 raise
             # A later page failing only means fewer hours; keep what we have
             log.warning(f"{LOG_PREFIX}: airport board page {page} ({mode}) failed: {e}")
@@ -436,6 +462,8 @@ def fb_sched_board(code, mode):
         except Exception as e:
             log.warning(f"{LOG_PREFIX}: skipped a malformed board row: {e}")
     cache[key] = {"at": now, "items": items, "flights": flights}
+    SCHEDULE_STATE["board_fails"] = 0
+    SCHEDULE_STATE["board_block_until"] = 0
     return items
 
 
@@ -482,7 +510,8 @@ def fb_sched_publish_gates():
         )
         return True
     except Exception as e:
-        log.warning(f"{LOG_PREFIX}: could not publish {GATES_SENSOR}: {e}")
+        if "waiting before the next try" not in str(e):
+            log.warning(f"{LOG_PREFIX}: could not publish {GATES_SENSOR}: {e}")
         return False
 
 
@@ -569,7 +598,8 @@ def fb_sched_publish_full():
             },
         )
     except Exception as e:
-        log.warning(f"{LOG_PREFIX}: could not publish {FULL_BOARD_SENSOR}: {e}")
+        if "waiting before the next try" not in str(e):
+            log.warning(f"{LOG_PREFIX}: could not publish {FULL_BOARD_SENSOR}: {e}")
 
 
 def fb_sched_add_board_gates(leg):

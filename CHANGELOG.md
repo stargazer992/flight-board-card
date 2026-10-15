@@ -5,6 +5,7 @@
 - Tracking panel: DELAYED is amber and DIVERTED / CANCELLED red on the split-flap style (everything else stays white).
 - Split-flap status shows EXPECTED and DEPARTED in full (the status column is one tile wider); time zones read IST in Dublin, CET/CEST in Paris and so on instead of GMT+1 (table in the code, easy to extend).
 - Companion script: when Flightradar24 times out or refuses, it now backs off (5 min, doubling up to 1 h) instead of retrying every minute, and keeps showing the last good board and gates. Settings `BOARD_BACKOFF_*` and `BOARD_STALE_MAX_SECONDS`.
+- Companion script: gate, terminal and belt are now fetched only for a flight you click or track. The background gates sensor is off by default (`PUBLISH_BOARD_GATES = False`).
 - DELAYED is now judged against the feed's usual estimate offset (Flightradar24 pads most departures by about 19 minutes), so a whole board no longer shows as delayed. New option `delay_minutes` (default 15).
 - Split-flap tiles are tighter (narrower, shorter, less padding). Flips are lighter on the browser for big boards.
 - Raleigh style now has the same tracking-panel features as the other styles: From > To, arrival time and status words (Delayed, Early, Diverted...), small x to stop tracking, no yellow wash; Diverted is red.

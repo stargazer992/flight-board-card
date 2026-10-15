@@ -113,7 +113,9 @@ FULL_BOARD_ICON = "mdi:airplane-clock"
 
 # Gate sensor for the card's London style: gate (departures) and baggage belt
 # (arrivals) of every flight on the airport board, in one small sensor.
-PUBLISH_BOARD_GATES = True
+# OFF by default: gate, terminal and belt are only looked up for a flight you click
+# (the card pop-up) or track, so nothing is fetched in the background for the whole board.
+PUBLISH_BOARD_GATES = False
 GATES_SENSOR = "sensor.flight_board_gates"
 GATES_NAME = "Flight board gates"
 GATES_ICON = "mdi:gate"
@@ -809,7 +811,8 @@ def fb_sched_fetch(code):
         except Exception as e:
             log.warning(f"{LOG_PREFIX}: skipped a malformed leg for {code}: {e}")
     best = fb_sched_pick(legs, time.time())
-    if best is not None:
+    # Gate, terminal and belt only for a flight the card asked about (clicked or tracked)
+    if best is not None and code in SCHEDULE_STATE["watch"]:
         fb_sched_add_details(best)
         fb_sched_add_board_gates(best)
         fb_sched_add_aerodatabox(code, best)
@@ -1345,6 +1348,9 @@ def flight_board_lookup(code=None):
         now = time.time()
         known = norm in SCHEDULE_STATE["watch"] and SCHEDULE_STATE["cache"].get(norm) is not None
         SCHEDULE_STATE["watch"][norm] = now + WATCH_MINUTES * 60
+        if not known:
+            # Looked up earlier without gate details: fetch it again now that it was asked for
+            SCHEDULE_STATE["cache"].pop(norm, None)
         # Aviationstack (free plan): only asked here, when a flight is clicked
         fresh = False
         try:

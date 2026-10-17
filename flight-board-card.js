@@ -10,7 +10,7 @@
 //   airline dropdown with add/remove, hide private flights, time window dropdown,
 //   flight tracker (pinned panel + Track flight dropdown) and the split-flap
 //   character-cycling animation.
-const FBC_VERSION = "1.10.0";
+const FBC_VERSION = "1.12.0";
 const FBC_THEMES = {
   classic:   "Classic (yellow)",
   splitflap: "Split-flap",

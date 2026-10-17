@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.0 (fork)
 
 - New style **Fleur de Lis (gold glass)** (`theme: fleur`): columns are Time, Destination/Origin, Airline, Gate, Status (Gate shows a dash until a flight's gate is known). the look of the landing-page redesign (charcoal background, gold accent, warm-white text, glass panels, Jost font). It uses the Raleigh row layout, so every Raleigh option (`city_codes`, `compact_time`, `airline_logos`, tracking, sorting, pop-up) works the same.
 - Tracking panel: DELAYED is amber and DIVERTED / CANCELLED red on the split-flap style (everything else stays white).

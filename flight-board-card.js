@@ -626,6 +626,8 @@ th .sorth.on { color:var(--fg); }
 .board.fleur .pcard { background:#1d1d1e; color:#F4EFE7; --sub:#B9B3A9; --th:#B9B3A9; --line:rgba(255,255,255,.15); border:1px solid rgba(201,166,107,.45); }
 .board.fleur .pcard .ptitle, .board.fleur .pcard .proute .pa b, .board.fleur .pcard .pgrid b { color:#E6CB96; }
 .board.fleur .pclose { color:#B9B3A9; }
+/* airline logos are dark artwork: give them a light plate so they stay readable on charcoal */
+.board.fleur td.rf img.alogo { background:rgba(255,255,255,.92); border-radius:6px; padding:2px 8px; box-sizing:content-box; }
 `;
   }
   _build() {

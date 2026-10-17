@@ -606,10 +606,15 @@ th .sorth.on { color:var(--fg); }
 .board.fleur th { background:transparent; color:#B9B3A9; font-weight:400; letter-spacing:.24em; border-bottom:1px solid rgba(255,255,255,.15); }
 .board.fleur th .sorth:hover, .board.fleur th .sorth.on { color:#E6CB96; text-decoration:none; }
 .board.fleur td { border-bottom:1px solid rgba(255,255,255,.09); }
+.board.fleur th.rt, .board.fleur td.rt { width:12%; font-weight:300; letter-spacing:.1em; color:#E6CB96; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.board.fleur td.rc { width:22%; }
+.board.fleur td.rf { width:20%; }
+.board.fleur td.rg { width:8%; }
+.board.fleur td.rs { width:38%; }
 .board.fleur td.rc b { font-weight:400; letter-spacing:.14em; }
 .board.fleur td.rf b.aname { color:#E6CB96; font-weight:400; letter-spacing:.08em; }
 .board.fleur td.rg { font-weight:300; color:#E6CB96; }
-.board.fleur td.rs { font-weight:400; letter-spacing:.12em; }
+.board.fleur td.rs { font-weight:400; letter-spacing:.06em; }
 .board.fleur td.rs.ok, .board.fleur td.rs.board { color:#C9A66B; } .board.fleur td.rs.warn { color:#E6CB96; } .board.fleur td.rs.bad { color:#FF9C92; }
 .board.fleur .rmx { color:#B9B3A9; } .board.fleur .rmx:hover { color:#FF9C92; }
 .board.fleur tr.trkd td { box-shadow:inset 0 0 0 9999px rgba(201,166,107,.18); }
@@ -2321,11 +2326,15 @@ th .sorth.on { color:var(--fg); }
     const sh = (k, label) => pfx === "trk" ? label :
       `<span class="sorth${this._sortKey === k ? " on" : ""}" data-sk="${k}" title="Sort by ${label.toLowerCase()}">${label}${this._sortKey === k ? (this._sortDir === -1 ? " &#9660;" : " &#9650;") : ""}</span>`;
     const zn = ft && this._trkZone() ? ` ${this._esc(this._tzAbbr(Date.now() / 1000, this._trkZone()))}` : "";
-    const head = `<tr><th class="rc">${ft ? "From &rsaquo; To / Time" + zn : sh("city", "City") + " / " + sh("time", "Time")}</th><th class="rf">${sh("airline", "Airline")} / ${sh("flight", "Flight")}</th>${hasG ? `<th class="rg">${sh("gate", "Gate")}</th>` : ""}<th class="rs">${sh("status", "Status")}</th>${hasX ? '<th class="rx"></th>' : ""}</tr>`;
+    // Fleur de Lis style (board lists only): separate columns Time, Destination/Origin, Airline, Gate, Status
+    const sep = this._theme === "fleur" && !ft;
+    const hasG2 = sep || hasG;
+    const head = sep ? `<tr><th class="rt">${sh("time", "Time")}</th><th class="rc">${sh("city", kind === "arr" ? "Origin" : "Destination")}</th><th class="rf">${sh("airline", "Airline")} / ${sh("flight", "Flight")}</th><th class="rg">${sh("gate", "Gate")}</th><th class="rs">${sh("status", "Status")}</th></tr>` :
+      `<tr><th class="rc">${ft ? "From &rsaquo; To / Time" + zn : sh("city", "City") + " / " + sh("time", "Time")}</th><th class="rf">${sh("airline", "Airline")} / ${sh("flight", "Flight")}</th>${hasG ? `<th class="rg">${sh("gate", "Gate")}</th>` : ""}<th class="rs">${sh("status", "Status")}</th>${hasX ? '<th class="rx"></th>' : ""}</tr>`;
     const body = rows.map((r0, i) => {
       const r = ft ? Object.assign({}, r0, this._arrRow(r0, kind)) : r0;
       const rk = this._rk(r, (pfx || "") + kind + i);
-      const gate = !hasG ? "" : pfx === "trk" ? (this._gateOf(r).g || "") : this._boardGate(r);
+      const gate = !hasG2 ? "" : !hasG ? "" : pfx === "trk" ? (this._gateOf(r).g || "") : this._boardGate(r);
       const st = this._rdStatus(r);
       const pk = (pfx || "") + kind + r.id;
       const prev = this._prev[pk], changed = prev !== undefined && prev !== r.s;
@@ -2336,6 +2345,8 @@ th .sorth.on { color:var(--fg); }
         const e = this._ends(r, kind), route = this._esc((e.from.k || e.from.c) + " \u203a " + (e.to.k || e.to.c));
         first = `<b class="cty">${route}</b><b class="cod">${route}</b>`;
       } else first = `<b class="cty">${this._esc(r.c)}</b><b class="cod">${this._esc(r.code || r.c)}</b>`;
+      if (sep) return `<tr${this._trkClass(r)}${rk}><td class="rt">${this._esc(this._rdTime(r.t))}</td><td class="rc">${first}</td><td class="rf">${this._rdAirline(r)}</td>` +
+        `<td class="rg">${this._esc(gate || "\u2013")}</td><td class="rs ${st.cls}">${sInner}</td></tr>`;
       return `<tr${this._trkClass(r)}${rk}><td class="rc">${first}<span>${this._esc(this._rdTime(r.t))}</span></td><td class="rf">${this._rdAirline(r)}</td>` +
         `${hasG ? `<td class="rg">${this._esc(gate)}</td>` : ""}<td class="rs ${st.cls}">${sInner}</td>${hasX ? `<td class="rx">${rmOf(r) ? `<span class="rmx" data-rm="${this._esc(rmOf(r))}" title="Stop tracking">&times;</span>` : ""}</td>` : ""}</tr>`;
     }).join("");

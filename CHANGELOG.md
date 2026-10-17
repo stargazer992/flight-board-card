@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- New style **Fleur de Lis (gold glass)** (`theme: fleur`): the look of the landing-page redesign (charcoal background, gold accent, warm-white text, glass panels, Jost font). It uses the Raleigh row layout, so every Raleigh option (`city_codes`, `compact_time`, `airline_logos`, tracking, sorting, pop-up) works the same.
+- New style **Fleur de Lis (gold glass)** (`theme: fleur`): columns are Time, Destination/Origin, Airline, Gate, Status (Gate shows a dash until a flight's gate is known). the look of the landing-page redesign (charcoal background, gold accent, warm-white text, glass panels, Jost font). It uses the Raleigh row layout, so every Raleigh option (`city_codes`, `compact_time`, `airline_logos`, tracking, sorting, pop-up) works the same.
 - Tracking panel: DELAYED is amber and DIVERTED / CANCELLED red on the split-flap style (everything else stays white).
 - Split-flap status shows EXPECTED and DEPARTED in full (the status column is one tile wider); time zones read IST in Dublin, CET/CEST in Paris and so on instead of GMT+1 (table in the code, easy to extend).
 - Companion script: when Flightradar24 times out or refuses, it now backs off (5 min, doubling up to 1 h) instead of retrying every minute, and keeps showing the last good board and gates. Settings `BOARD_BACKOFF_*` and `BOARD_STALE_MAX_SECONDS`.

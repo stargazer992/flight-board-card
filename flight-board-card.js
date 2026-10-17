@@ -604,14 +604,16 @@ th .sorth.on { color:var(--fg); }
 .board.fleur .ph { background:rgba(201,166,107,.07); color:#E6CB96; text-shadow:none; font-weight:300; letter-spacing:.3em; justify-content:flex-start; border-bottom:1px solid rgba(201,166,107,.45); }
 .board.fleur .ph svg { filter:none; fill:#E6CB96; }
 .board.fleur th { background:transparent; color:#B9B3A9; font-weight:400; letter-spacing:.24em; border-bottom:1px solid rgba(255,255,255,.15); }
+.board.fleur th { white-space:nowrap; overflow:hidden; text-overflow:clip; letter-spacing:.14em; }
+.board.fleur th.rf { letter-spacing:.04em; font-weight:400; }
 .board.fleur th .sorth:hover, .board.fleur th .sorth.on { color:#E6CB96; text-decoration:none; }
 .board.fleur td { border-bottom:1px solid rgba(255,255,255,.09); }
-.board.fleur th.rt, .board.fleur td.rt { width:12%; font-weight:300; letter-spacing:.1em; color:#E6CB96; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.board.fleur td.rc { width:22%; }
-.board.fleur td.rf { width:20%; }
-.board.fleur td.rg { width:8%; }
-.board.fleur td.rs { width:38%; }
-.board.fleur td.rc b { font-weight:400; letter-spacing:.14em; }
+.board.fleur th.rt, .board.fleur td.rt { width:15%; font-weight:300; letter-spacing:.1em; color:#E6CB96; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.board.fleur th.rc, .board.fleur td.rc { width:29%; }
+.board.fleur th.rf, .board.fleur td.rf { width:19%; }
+.board.fleur th.rg, .board.fleur td.rg { width:9%; }
+.board.fleur th.rs, .board.fleur td.rs { width:28%; }
+.board.fleur td.rc b { font-weight:400; letter-spacing:.06em; }
 .board.fleur td.rf b.aname { color:#E6CB96; font-weight:400; letter-spacing:.08em; }
 .board.fleur td.rg { font-weight:300; color:#E6CB96; }
 .board.fleur td.rs { font-weight:400; letter-spacing:.06em; }
@@ -1293,7 +1295,8 @@ th .sorth.on { color:var(--fg); }
   _cityFit() {
     const root = this.shadowRoot;
     if (!root) return;
-    const mode = String(this._config.city_codes || "auto").toLowerCase();
+    let mode = String(this._config.city_codes || "auto").toLowerCase();
+    if (this._theme === "fleur" && mode === "auto") mode = "never";   // Fleur de Lis: always spell out the city (set city_codes: always for codes)
     root.querySelectorAll(".board.raleigh table").forEach(t => {
       let on = mode === "always";
       if (mode === "auto") {

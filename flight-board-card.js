@@ -2420,7 +2420,7 @@ th .sorth.on { color:var(--fg); }
     this._shorten();
     this._cityFit();
     this._flapGo();
-    root.querySelector(".foot").textContent = dd ? "Data: Flightradar24 - updated " + this._fmt(new Date(dd.last_updated).getTime() / 1000) + " - style: " + FBC_THEMES[this._theme] + (this._airline ? " - airline: " + this._airline : "") : "";
+    root.querySelector(".foot").textContent = dd ? "Data: Flightradar24 - updated " + this._fmt(new Date(dd.last_updated).getTime() / 1000) + " - v" + FBC_VERSION + " - style: " + FBC_THEMES[this._theme] + (this._airline ? " - airline: " + this._airline : "") : "";
     this._tick();
   }
 }

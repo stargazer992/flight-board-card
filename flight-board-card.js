@@ -18,6 +18,7 @@ const FBC_THEMES = {
   amsterdam: "Amsterdam style",
   london:    "London style",
   raleigh:   "Raleigh style",
+  fleur:     "Fleur de Lis (gold glass)",
 };
 const FBC_THEME_ALIASES = { solari: "splitflap", frankfurt: "digital", schiphol: "amsterdam", heathrow: "london", led: "digital" };
 // Time zone names for zones where Intl only gives "GMT+n": [standard, summer]
@@ -590,6 +591,34 @@ th .sorth.on { color:var(--fg); }
 .board.raleigh .pcard { color:#101b33; --sub:#5d6a80; --th:#56627a; --line:#cfd6e2; }
 .board.raleigh .pcard .ptitle, .board.raleigh .pcard .proute .pa b, .board.raleigh .pcard .pgrid b { color:#101b33; }
 .board.raleigh .pclose { color:#56627a; }
+
+/* Fleur de Lis style: the gold-on-charcoal glass look of the landing page redesign (Jost, warm white, gold accent). Reuses the Raleigh row layout. */
+.board.fleur { --bg:#161617; --fg:#F4EFE7; --font:Jost,'Century Gothic','Avenir Next',-apple-system,'SF Pro Display',sans-serif;
+  --title:#F4EFE7; --accent:#C9A66B; --clock:#F4EFE7; --panel:rgba(255,255,255,.055); --hbg:transparent; --hfg:#E6CB96; --th:#B9B3A9; --line:rgba(255,255,255,.15); --line2:rgba(255,255,255,.09);
+  --zebra:transparent; --time:#B9B3A9; --city:#F4EFE7; --flight:#B9B3A9; --st:#F4EFE7; --ok:#C9A66B; --warn:#E6CB96; --bad:#FF9C92; --brd:#C9A66B;
+  --sub:#B9B3A9; --selbg:rgba(255,255,255,.06); --selfg:#F4EFE7;
+  background:radial-gradient(1200px 700px at 78% -8%, rgba(201,166,107,.10), transparent 60%), linear-gradient(180deg,#1f1f20 0%,#161617 100%); font-weight:400; border:1px solid rgba(255,255,255,.07); }
+.board.fleur .name { font-weight:300; letter-spacing:.3em; }
+.board.fleur .clock { font-weight:300; letter-spacing:.14em; }
+.board.fleur .panel { background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.15); border-radius:14px; }
+.board.fleur .ph { background:rgba(201,166,107,.07); color:#E6CB96; text-shadow:none; font-weight:300; letter-spacing:.3em; justify-content:flex-start; border-bottom:1px solid rgba(201,166,107,.45); }
+.board.fleur .ph svg { filter:none; fill:#E6CB96; }
+.board.fleur th { background:transparent; color:#B9B3A9; font-weight:400; letter-spacing:.24em; border-bottom:1px solid rgba(255,255,255,.15); }
+.board.fleur th .sorth:hover, .board.fleur th .sorth.on { color:#E6CB96; text-decoration:none; }
+.board.fleur td { border-bottom:1px solid rgba(255,255,255,.09); }
+.board.fleur td.rc b { font-weight:400; letter-spacing:.14em; }
+.board.fleur td.rf b.aname { color:#E6CB96; font-weight:400; letter-spacing:.08em; }
+.board.fleur td.rg { font-weight:300; color:#E6CB96; }
+.board.fleur td.rs { font-weight:400; letter-spacing:.12em; }
+.board.fleur td.rs.ok, .board.fleur td.rs.board { color:#C9A66B; } .board.fleur td.rs.warn { color:#E6CB96; } .board.fleur td.rs.bad { color:#FF9C92; }
+.board.fleur .rmx { color:#B9B3A9; } .board.fleur .rmx:hover { color:#FF9C92; }
+.board.fleur tr.trkd td { box-shadow:inset 0 0 0 9999px rgba(201,166,107,.18); }
+.board.fleur .apin, .board.fleur .thbtn, .board.fleur .albtn, .board.fleur .wnbtn, .board.fleur .rnbtn, .board.fleur .trbtn { border-radius:999px; border:1px solid rgba(255,255,255,.15); letter-spacing:.12em; padding:6px 14px; }
+.board.fleur .trkok { background:linear-gradient(180deg,#E6CB96,#A47F47); color:#1b1a18; border-radius:999px; font-weight:500; }
+.board.fleur .trkchip { border-radius:999px; }
+.board.fleur .pcard { background:#1d1d1e; color:#F4EFE7; --sub:#B9B3A9; --th:#B9B3A9; --line:rgba(255,255,255,.15); border:1px solid rgba(201,166,107,.45); }
+.board.fleur .pcard .ptitle, .board.fleur .pcard .proute .pa b, .board.fleur .pcard .pgrid b { color:#E6CB96; }
+.board.fleur .pclose { color:#B9B3A9; }
 `;
   }
   _build() {
@@ -1282,7 +1311,7 @@ th .sorth.on { color:var(--fg); }
   }
   _applyTheme() {
     const b = this.shadowRoot.querySelector(".board");
-    if (b) b.className = "board " + this._theme + (this._h12() ? " h12" : "") + (this._config.show_airline === false ? " noair" : "") + (this._config.show === "tracked" && this._config.tracked_controls !== true ? " mini" : "");
+    if (b) b.className = "board " + this._theme + (this._theme === "fleur" ? " raleigh" : "") + (this._h12() ? " h12" : "") + (this._config.show_airline === false ? " noair" : "") + (this._config.show === "tracked" && this._config.tracked_controls !== true ? " mini" : "");
     const tbb = this.shadowRoot.querySelector(".thbtn");
     if (tbb) tbb.innerHTML = (FBC_THEMES[this._theme] || this._theme) + " &#9662;";
     this._fit(); setTimeout(() => this._fit(), 300);
@@ -2198,7 +2227,7 @@ th .sorth.on { color:var(--fg); }
   _table(rows, kind, pfx) {
     if (rows === null) return `<div class="empty">Sensor not available</div>`;
     if (!rows.length) return `<div class="empty">${this._airline || this._window ? "No " + (this._airline ? this._esc(this._airline) + " " : "") + "flights in this window" : "No flights right now"}</div>`;
-    if (this._theme === "raleigh") return this._tableRaleigh(rows, kind, pfx);
+    if (this._theme === "raleigh" || this._theme === "fleur") return this._tableRaleigh(rows, kind, pfx);
     const flap = this._theme === "splitflap", n = this._tiles4();
     // Gate column: only in the tracker panels, and only when a tracked flight has gate or terminal data
     const hasG = pfx === "trk" && this._gateTiles > 0;
@@ -2325,7 +2354,7 @@ th .sorth.on { color:var(--fg); }
     const map = st.attributes[r.kind === "arr" ? "arrivals" : "departures"];
     const row = map && map[this._trkNorm(r.fl)];
     if (!Array.isArray(row)) return "";
-    const v = r.kind === "arr" && this._theme !== "raleigh" ? row[2] : row[0];
+    const v = r.kind === "arr" && this._theme !== "raleigh" && this._theme !== "fleur" ? row[2] : row[0];
     return v === null || v === undefined ? "" : String(v);
   }
   _missing() {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.0 (fork)
+
+- Tracking panel: the Position section shows where the aircraft is as "57 miles southwest of Charleston, WV" (nearest major city) instead of latitude / longitude.
+
 ## 1.12.0 (fork)
 
 - Fleur de Lis style spells out the city name instead of the airport code, even on narrow cards (`city_codes: always` brings the codes back).

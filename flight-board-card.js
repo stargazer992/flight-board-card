@@ -10,7 +10,7 @@
 //   airline dropdown with add/remove, hide private flights, time window dropdown,
 //   flight tracker (pinned panel + Track flight dropdown) and the split-flap
 //   character-cycling animation.
-const FBC_VERSION = "1.12.0";
+const FBC_VERSION = "1.13.0";
 const FBC_THEMES = {
   classic:   "Classic (yellow)",
   splitflap: "Split-flap",
@@ -20,6 +20,48 @@ const FBC_THEMES = {
   raleigh:   "Raleigh style",
   fleur:     "Fleur de Lis (gold glass)",
 };
+// Major cities for the position readout ("57 miles southwest of Charleston, WV"): [name, state / country, lat, lon]
+const FBC_CITIES = [
+  ["Albany","NY",42.65,-73.76], ["Albuquerque","NM",35.08,-106.65], ["Anchorage","AK",61.22,-149.90], ["Asheville","NC",35.60,-82.55],
+  ["Atlanta","GA",33.75,-84.39], ["Augusta","GA",33.47,-81.97], ["Austin","TX",30.27,-97.74], ["Baltimore","MD",39.29,-76.61],
+  ["Baton Rouge","LA",30.45,-91.15], ["Billings","MT",45.78,-108.50], ["Birmingham","AL",33.52,-86.80], ["Bismarck","ND",46.81,-100.78],
+  ["Boise","ID",43.62,-116.20], ["Boston","MA",42.36,-71.06], ["Buffalo","NY",42.89,-78.88], ["Burlington","VT",44.48,-73.21],
+  ["Charleston","SC",32.78,-79.93], ["Charleston","WV",38.35,-81.63], ["Charlotte","NC",35.23,-80.84], ["Chattanooga","TN",35.05,-85.31],
+  ["Cheyenne","WY",41.14,-104.82], ["Chicago","IL",41.88,-87.63], ["Cincinnati","OH",39.10,-84.51], ["Cleveland","OH",41.50,-81.69],
+  ["Colorado Springs","CO",38.83,-104.82], ["Columbia","SC",34.00,-81.03], ["Columbus","OH",39.96,-83.00], ["Corpus Christi","TX",27.80,-97.40],
+  ["Dallas","TX",32.78,-96.80], ["Davenport","IA",41.52,-90.58], ["Dayton","OH",39.76,-84.19], ["Denver","CO",39.74,-104.99],
+  ["Des Moines","IA",41.59,-93.62], ["Detroit","MI",42.33,-83.05], ["Duluth","MN",46.79,-92.10], ["El Paso","TX",31.76,-106.49],
+  ["Erie","PA",42.13,-80.09], ["Eugene","OR",44.05,-123.09], ["Fairbanks","AK",64.84,-147.72], ["Fargo","ND",46.88,-96.79],
+  ["Flagstaff","AZ",35.20,-111.65], ["Fort Myers","FL",26.64,-81.87], ["Fort Wayne","IN",41.08,-85.14], ["Fort Worth","TX",32.76,-97.33],
+  ["Fresno","CA",36.74,-119.79], ["Grand Rapids","MI",42.96,-85.67], ["Green Bay","WI",44.51,-88.01], ["Greensboro","NC",36.07,-79.79],
+  ["Greenville","SC",34.85,-82.40], ["Harrisburg","PA",40.27,-76.88], ["Hartford","CT",41.76,-72.67], ["Helena","MT",46.59,-112.04],
+  ["Honolulu","HI",21.31,-157.86], ["Houston","TX",29.76,-95.37], ["Huntsville","AL",34.73,-86.59], ["Indianapolis","IN",39.77,-86.16],
+  ["Jackson","MS",32.30,-90.18], ["Jacksonville","FL",30.33,-81.66], ["Kansas City","MO",39.10,-94.58], ["Key West","FL",24.56,-81.78],
+  ["Knoxville","TN",35.96,-83.92], ["Las Vegas","NV",36.17,-115.14], ["Lexington","KY",38.04,-84.50], ["Lincoln","NE",40.81,-96.70],
+  ["Little Rock","AR",34.75,-92.29], ["Los Angeles","CA",34.05,-118.24], ["Louisville","KY",38.25,-85.76], ["Lubbock","TX",33.58,-101.86],
+  ["Madison","WI",43.07,-89.40], ["Memphis","TN",35.15,-90.05], ["Miami","FL",25.76,-80.19], ["Milwaukee","WI",43.04,-87.91],
+  ["Minneapolis","MN",44.98,-93.27], ["Missoula","MT",46.87,-114.00], ["Mobile","AL",30.69,-88.04], ["Montgomery","AL",32.37,-86.30],
+  ["Nashville","TN",36.16,-86.78], ["New Orleans","LA",29.95,-90.07], ["New York","NY",40.71,-74.01], ["Norfolk","VA",36.85,-76.29],
+  ["Oklahoma City","OK",35.47,-97.52], ["Omaha","NE",41.26,-95.93], ["Orlando","FL",28.54,-81.38], ["Pensacola","FL",30.42,-87.22],
+  ["Philadelphia","PA",39.95,-75.17], ["Phoenix","AZ",33.45,-112.07], ["Pittsburgh","PA",40.44,-80.00], ["Portland","ME",43.66,-70.26],
+  ["Portland","OR",45.52,-122.68], ["Providence","RI",41.82,-71.41], ["Raleigh","NC",35.78,-78.64], ["Reno","NV",39.53,-119.81],
+  ["Richmond","VA",37.54,-77.44], ["Roanoke","VA",37.27,-79.94], ["Rochester","NY",43.16,-77.61], ["Sacramento","CA",38.58,-121.49],
+  ["Salt Lake City","UT",40.76,-111.89], ["San Antonio","TX",29.42,-98.49], ["San Diego","CA",32.72,-117.16], ["San Francisco","CA",37.77,-122.42],
+  ["Santa Fe","NM",35.69,-105.94], ["Savannah","GA",32.08,-81.09], ["Seattle","WA",47.61,-122.33], ["Shreveport","LA",32.53,-93.75],
+  ["Sioux Falls","SD",43.55,-96.73], ["Spokane","WA",47.66,-117.43], ["Springfield","MO",37.21,-93.29], ["St. Louis","MO",38.63,-90.20],
+  ["Syracuse","NY",43.05,-76.15], ["Tallahassee","FL",30.44,-84.28], ["Tampa","FL",27.95,-82.46], ["Toledo","OH",41.65,-83.54],
+  ["Tucson","AZ",32.22,-110.97], ["Tulsa","OK",36.15,-95.99], ["Washington","DC",38.91,-77.04], ["Wichita","KS",37.69,-97.34],
+  ["Wilmington","NC",34.23,-77.94], ["Winston-Salem","NC",36.10,-80.24], ["Atlantic City","NJ",39.36,-74.42], ["Cape Hatteras","NC",35.25,-75.53],
+  ["Bermuda","",32.30,-64.78], ["Nassau","Bahamas",25.05,-77.35], ["San Juan","PR",18.47,-66.11], ["Halifax","NS",44.65,-63.57],
+  ["Montreal","QC",45.50,-73.57], ["Toronto","ON",43.65,-79.38], ["Ottawa","ON",45.42,-75.70], ["Winnipeg","MB",49.90,-97.14],
+  ["Calgary","AB",51.05,-114.07], ["Vancouver","BC",49.28,-123.12], ["St. John's","NL",47.56,-52.71], ["Quebec City","QC",46.81,-71.21],
+  ["Mexico City","Mexico",19.43,-99.13], ["Monterrey","Mexico",25.69,-100.32], ["Cancun","Mexico",21.16,-86.85], ["Havana","Cuba",23.11,-82.37],
+  ["Kingston","Jamaica",17.97,-76.79], ["Panama City","Panama",8.98,-79.52], ["Bogota","Colombia",4.71,-74.07], ["Reykjavik","Iceland",64.15,-21.94],
+  ["Dublin","Ireland",53.35,-6.26], ["London","UK",51.51,-0.13], ["Paris","France",48.86,2.35], ["Amsterdam","Netherlands",52.37,4.90],
+  ["Frankfurt","Germany",50.11,8.68], ["Madrid","Spain",40.42,-3.70], ["Lisbon","Portugal",38.72,-9.14], ["Rome","Italy",41.90,12.50],
+  ["Zurich","Switzerland",47.38,8.54], ["Copenhagen","Denmark",55.68,12.57], ["Oslo","Norway",59.91,10.75], ["Stockholm","Sweden",59.33,18.07],
+  ["Shannon","Ireland",52.70,-8.91], ["Glasgow","UK",55.86,-4.25]
+];
 const FBC_THEME_ALIASES = { solari: "splitflap", frankfurt: "digital", schiphol: "amsterdam", heathrow: "london", led: "digital" };
 // Time zone names for zones where Intl only gives "GMT+n": [standard, summer]
 const FBC_TZ_NAMES = {
@@ -1013,6 +1055,29 @@ th .sorth.on { color:var(--fg); }
     const h = Math.floor(m / 60), mm = m % 60;
     return h + "h " + String(mm).padStart(2, "0") + "m";
   }
+  // "57 miles southwest of Charleston, WV": nearest major city (from FBC_CITIES) and the direction from that city to the aircraft
+  _nearCity(lat, lon) {
+    try {
+      const R = 3958.8, rad = Math.PI / 180;
+      let best = null, bd = Infinity;
+      for (const c of FBC_CITIES) {
+        const dLa = (c[2] - lat) * rad, dLo = (c[3] - lon) * rad;
+        const a = Math.sin(dLa / 2) ** 2 + Math.cos(lat * rad) * Math.cos(c[2] * rad) * Math.sin(dLo / 2) ** 2;
+        const d = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+        if (d < bd) { bd = d; best = c; }
+      }
+      if (!best) return null;
+      const name = best[0] + (best[1] ? ", " + best[1] : "");
+      if (bd < 5) return "Over " + name;
+      // bearing from the city to the aircraft
+      const y = Math.sin((lon - best[3]) * rad) * Math.cos(lat * rad);
+      const x = Math.cos(best[2] * rad) * Math.sin(lat * rad) - Math.sin(best[2] * rad) * Math.cos(lat * rad) * Math.cos((lon - best[3]) * rad);
+      const brg = (Math.atan2(y, x) / rad + 360) % 360;
+      const dir = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"][Math.round(brg / 45) % 8];
+      const mi = Math.round(bd);
+      return mi.toLocaleString("en-US") + " mile" + (mi === 1 ? "" : "s") + " " + dir + " of " + name;
+    } catch (e) { return null; }
+  }
   _nm(lat1, lon1, lat2, lon2) {
     const R = 3440.065, rad = x => x * Math.PI / 180;
     const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
@@ -1186,7 +1251,7 @@ th .sorth.on { color:var(--fg); }
     if (pos) {
       const ago = pos.when ? " - " + this._dur(now - pos.when) + " ago" : "";
       h += `<div class="psec"><h4>Position - ${E(pos.src)}${E(ago)}</h4><div class="pgrid">` +
-        cell("Latitude / longitude", pos.lat.toFixed(3) + ", " + pos.lon.toFixed(3)) +
+        cell("Location", this._nearCity(pos.lat, pos.lon) || (pos.lat.toFixed(3) + ", " + pos.lon.toFixed(3))) +
         cell("Altitude", pos.onGround ? "On the ground" : (pos.alt !== null ? Math.round(pos.alt).toLocaleString("en-US") + " ft" : null)) +
         cell("Speed", pos.spd !== null ? Math.round(pos.spd) + " kt" : null) +
         cell("Heading", pos.hdg !== null ? Math.round(pos.hdg) + " deg" : null) +

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.0 (fork)
+
+- Tracking panel: the DELAYED badge says how late, e.g. "DELAYED 11:21 PM (+30 min)" (5 minutes or more vs. schedule).
+- Tracking panel: vertical rate reads "Level", "Climbing 1,500 ft/min" or "Descending 1,200 ft/min" (rounded to 50).
+- Tracking panel: a position older than 5 minutes is headed "Last seen 6 min ago" instead of looking live.
+
 ## 1.13.1 (fork)
 
 - Tracking panel: "Lands in 22 min" now also shows the arrival clock time in the destination's local time, e.g. "Lands in 22 min (11:22 PM)".

@@ -10,7 +10,7 @@
 //   airline dropdown with add/remove, hide private flights, time window dropdown,
 //   flight tracker (pinned panel + Track flight dropdown) and the split-flap
 //   character-cycling animation.
-const FBC_VERSION = "1.13.1";
+const FBC_VERSION = "1.14.0";
 const FBC_THEMES = {
   classic:   "Classic (yellow)",
   splitflap: "Split-flap",
@@ -1223,7 +1223,12 @@ th .sorth.on { color:var(--fg); }
     const signs = r.kind === "arr" ? sign("Arrival gate", d.code, dg, true, "arr") : sign("Departure gate", o.code, og, false, "dep");
     if (signs) h += `<div class="gsigns">${signs}</div>`;
     h += `<div class="proute"><div class="pa"><b>${E(o.code || "-")}</b><span>${E(o.city || "")}</span></div><div class="pm">${cd ? `<span class="pmcd">${E(cd)}</span>` : ""}<svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="98" y2="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/></svg><svg class="pa2" viewBox="0 0 10 12" aria-hidden="true"><path d="M1 1 L9 6 L1 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="pa" style="text-align:right"><b>${E(d.code || "-")}</b><span>${E(d.city || "")}</span></div></div>`;
-    h += `<span class="pbadge${cls}">${E(r.s)}</span>`;
+    let dmin = "";
+    try {   // how late, in plain words: actual/estimated vs scheduled (arrivals use the arrival times, departures the departure times)
+      const sch = r.kind === "arr" ? sa : sd, act = r.kind === "arr" ? (ra || ea) : (rd || ed);
+      if (/DELAY/i.test(String(r.s || "")) && sch && act && act - sch >= 300) { const m = Math.round((act - sch) / 60); dmin = " (+" + (m >= 60 ? Math.floor(m / 60) + " h " + (m % 60 ? (m % 60) + " min" : "") : m + " min") + ")"; }
+    } catch (e) {}
+    h += `<span class="pbadge${cls}">${E(r.s)}${E(dmin.replace(" h  ", " h "))}</span>`;
     // Route map (needs both airport positions)
     try {
       const ll = (code, la, lo) => {
@@ -1249,13 +1254,14 @@ th .sorth.on { color:var(--fg); }
     h += `<div class="psec"><h4>Departure${o.code ? " - " + E(o.code) : ""}${oTz ? " (local time)" : ""}</h4><div class="pgrid">${tc(sd, ed, rd, oTz)}</div></div>`;
     h += `<div class="psec"><h4>Arrival${d.code ? " - " + E(d.code) : ""}${dTz ? " (local time)" : ""}</h4><div class="pgrid">${tc(sa, ea, ra, dTz)}</div></div>`;
     if (pos) {
-      const ago = pos.when ? " - " + this._dur(now - pos.when) + " ago" : "";
+      const stale = pos.when && now - pos.when > 300;
+      const ago = pos.when ? (stale ? " - last seen " : " - ") + this._dur(now - pos.when) + " ago" : "";
       h += `<div class="psec"><h4>Position - ${E(pos.src)}${E(ago)}</h4><div class="pgrid">` +
         cell("Location", this._nearCity(pos.lat, pos.lon) || (pos.lat.toFixed(3) + ", " + pos.lon.toFixed(3))) +
         cell("Altitude", pos.onGround ? "On the ground" : (pos.alt !== null ? Math.round(pos.alt).toLocaleString("en-US") + " ft" : null)) +
         cell("Speed", pos.spd !== null ? Math.round(pos.spd) + " kt" : null) +
         cell("Heading", pos.hdg !== null ? Math.round(pos.hdg) + " deg" : null) +
-        cell("Vertical rate", pos.vr !== null && !pos.onGround ? (pos.vr > 0 ? "+" : "") + Math.round(pos.vr).toLocaleString("en-US") + " ft/min" : null) +
+        cell("Vertical rate", pos.vr !== null && !pos.onGround ? (Math.abs(pos.vr) < 300 ? "Level" : (pos.vr > 0 ? "Climbing " : "Descending ") + (Math.round(Math.abs(pos.vr) / 50) * 50).toLocaleString("en-US") + " ft/min") : null) +
         cell("Distance to " + (d.code || "destination"), dist) + `</div></div>`;
     }
     // What is missing, and why

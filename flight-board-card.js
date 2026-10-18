@@ -1023,16 +1023,29 @@ th .sorth.on { color:var(--fg); }
     return !!(this._hass && sv.length === 2 && this._hass.services && this._hass.services[sv[0]] && this._hass.services[sv[0]][sv[1]]);
   }
   // Ask the companion script to look a flight up (at most once every 5 minutes per flight)
-  _requestLookup(code) {
+  // tracked = true for flights that are really tracked on the card: the script then polls their live position
+  // (renewed every 5 minutes). A flight you only click for details is looked up once and never polled live.
+  _requestLookup(code, tracked) {
     try {
       const k = this._trkNorm(code);
       if (!k || !this._hasLookup()) return;
       this._lkReq = this._lkReq || {};
       const now = Date.now();
-      if (this._lkReq[k] && now - this._lkReq[k] < 300000) return;
-      this._lkReq[k] = now;
+      const key = (tracked ? "t:" : "") + k;
+      if (this._lkReq[key] && now - this._lkReq[key] < 300000) return;
+      this._lkReq[key] = now;
       const sv = String(this._config.lookup_service).split(".");
-      const p = this._hass.callService(sv[0], sv[1], { code: k });
+      const p = this._hass.callService(sv[0], sv[1], tracked ? { code: k, tracked: true } : { code: k });
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+  }
+  // A flight was removed from the tracker: tell the companion script to stop watching and polling it
+  _stopLookup(k) {
+    try {
+      if (!k || !this._hasLookup()) return;
+      if (this._lkReq) { delete this._lkReq[k]; delete this._lkReq["t:" + k]; }
+      const sv = String(this._config.lookup_service).split(".");
+      const p = this._hass.callService(sv[0], sv[1], { code: k, stop: true });
       if (p && p.catch) p.catch(() => {});
     } catch (e) {}
   }
@@ -1624,6 +1637,7 @@ th .sorth.on { color:var(--fg); }
   _removeTrack(code) {
     const k = this._trkNorm(code);
     this._releaseTrack(k);
+    this._stopLookup(k);
     this._trkExtra = (this._trkExtra || []).filter(c => c !== k);
     this._saveTrack();
     this._render();
@@ -1885,7 +1899,7 @@ th .sorth.on { color:var(--fg); }
     if (ex.removed) return;   // removing a flight re-renders the panel
     dep = ex.dep; arr = ex.arr;
     // Ask the companion script for gate and live data of every tracked flight (throttled), then decide on the Gate column
-    if (this._config.show_gate !== false) for (const o of all) this._requestLookup(o.code);
+    if (this._config.show_gate !== false) for (const o of all) this._requestLookup(o.code, true);
     const gt = this._config.show_gate !== false && dep.concat(arr).some(r => { const g = this._gateOf(r); return !!(g.g || g.term); }) ? 4 : 0;
     if (gt !== this._gateTiles) { this._gateTiles = gt; this._fit(); }
     const cols = root.querySelector(".cols");

@@ -73,6 +73,10 @@ EXTRA_FLIGHTS = []
 # Short on purpose: a flight you only clicked for details should stop being polled soon after.
 WATCH_MINUTES = 20
 
+# A flight that is TRACKED on the card is renewed by the card every 5 minutes; if the card stops asking
+# (flight removed, page closed) live polling stops after this many minutes. Removing a flight stops it at once.
+TRACK_MINUTES = 12
+
 # Send a phone / HA notification when OpenSky cannot give a live position (usually its rate limit).
 # Off by default: the board keeps working without it and the reason is in the log.
 NOTIFY_OPENSKY_ERRORS = False
@@ -215,6 +219,7 @@ SCHEDULE_STATE = {
     "board_block_until": 0,   # no Flightradar24 requests before this time (backoff)
     "board_cache": {}, # "airport|mode" -> {"at": ts, "items": {flight number: [entries]}}
     "watch": {},       # code -> expiry timestamp (asked by the card)
+    "track": {},       # code -> expiry timestamp (flights that are really TRACKED on the card; only these get live OpenSky polling)
     "token": {"value": "", "expires": 0},
     "os_block_until": 0,  # OpenSky said "too many requests": do not ask before this time
     "busy": False,
@@ -275,6 +280,21 @@ def fb_sched_clean(value):
     if text == "" or text.upper() in ("N/A", "NA", "NONE", "NULL", "-"):
         return None
     return text
+
+
+def fb_sched_is_tracked(code):
+    # True when the card is tracking this flight (or it is listed in EXTRA_FLIGHTS): only then is the live
+    # OpenSky position polled. Flights you only clicked for details never are.
+    try:
+        exp = SCHEDULE_STATE["track"].get(code)
+        if exp is not None and exp >= time.time():
+            return True
+        for x in EXTRA_FLIGHTS:
+            if fb_sched_norm(x) == code:
+                return True
+    except Exception as e:
+        log.warning(f"{LOG_PREFIX}: tracked check failed for {code}: {e}")
+    return False
 
 
 def fb_sched_norm(value):
@@ -1184,6 +1204,9 @@ def fb_sched_rebuild():
                     if cache.get(code) is not None:
                         leg_now = cache[code]["leg"]
                     hint = hints.get(code)
+                    if not fb_sched_is_tracked(code):
+                        os_cache.pop(code, None)   # only tracked flights get live polling
+                        continue
                     if not fb_sched_airborne(leg_now, hint):
                         os_cache.pop(code, None)
                         continue
@@ -1342,15 +1365,24 @@ def flight_board_schedule_refresh():
 
 
 @service
-def flight_board_lookup(code=None):
+def flight_board_lookup(code=None, tracked=False, stop=False):
     # Called by the card (pyscript.flight_board_lookup) when you open a flight pop-up
     # or track a flight. Adds the flight to the watch list and looks it up now.
-    # Example: service: pyscript.flight_board_lookup  data: {code: "DL1505"}
+    # tracked: true  = the flight is tracked on the card (live OpenSky polling while the card keeps renewing it)
+    # stop: true     = the flight was removed from the tracker: stop watching and polling it now
+    # Example: service: pyscript.flight_board_lookup  data: {code: "DL1505", tracked: true}
     try:
         norm = fb_sched_norm(code)
         if not norm:
             return
         now = time.time()
+        if stop:
+            SCHEDULE_STATE["watch"].pop(norm, None)
+            SCHEDULE_STATE["track"].pop(norm, None)
+            SCHEDULE_STATE["os_cache"].pop(norm, None)
+            return
+        if tracked:
+            SCHEDULE_STATE["track"][norm] = now + TRACK_MINUTES * 60
         known = norm in SCHEDULE_STATE["watch"] and SCHEDULE_STATE["cache"].get(norm) is not None
         SCHEDULE_STATE["watch"][norm] = now + WATCH_MINUTES * 60
         if not known:

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Companion script: live OpenSky polling now happens only for flights that are tracked on the card. The card marks tracked flights (`tracked: true`, renewed every 5 minutes) and sends `stop: true` when you remove one, so polling stops at once. A flight you only click for details is looked up but never polled live. New `TRACK_MINUTES` (12) is the safety timeout if the card stops asking.
+
 ## 1.14.0 (fork)
 
 - Tracking panel: the DELAYED badge says how late, e.g. "DELAYED 11:21 PM (+30 min)" (5 minutes or more vs. schedule).

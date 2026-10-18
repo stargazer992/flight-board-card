@@ -69,8 +69,13 @@ OUT_ICON = "mdi:airplane-clock"
 # Example: ["AA4415", "DL1234"]
 EXTRA_FLIGHTS = []
 
-# Flights the card asks about (pop-up / tracker) are watched for this many minutes
-WATCH_MINUTES = 180
+# Flights the card asks about (pop-up / tracker) are watched for this many minutes.
+# Short on purpose: a flight you only clicked for details should stop being polled soon after.
+WATCH_MINUTES = 20
+
+# Send a phone / HA notification when OpenSky cannot give a live position (usually its rate limit).
+# Off by default: the board keeps working without it and the reason is in the log.
+NOTIFY_OPENSKY_ERRORS = False
 
 # Flightradar24 flight list endpoint (same data as the flight page)
 FR24_URL = "https://api.flightradar24.com/common/v1/flight/list.json?query={query}&fetchBy=flight&page=1&limit=25"
@@ -1303,7 +1308,7 @@ def fb_sched_rebuild():
             "Could not read the Flightradar24 airport board for the gate sensor "
             + GATES_SENSOR + ". Flightradar24 may be blocking or have changed the endpoint. Check the log."
         )
-    elif os_failures:
+    elif os_failures and NOTIFY_OPENSKY_ERRORS:
         fb_sched_notify_error(
             "Could not get the live position from OpenSky for: " + ", ".join(os_failures)
             + ". OpenSky may be rate limiting you (add an account in the script). Check the log."

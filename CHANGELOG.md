@@ -16,6 +16,7 @@
 
 ## 1.12.0 (fork)
 
+- Companion script: flights you only click for details are watched for 20 minutes (was 3 hours, `WATCH_MINUTES`), and OpenSky rate-limit notices are off by default (`NOTIFY_OPENSKY_ERRORS`), so you no longer get "could not get the live position" for flights you are not tracking.
 - Fleur de Lis style spells out the city name instead of the airport code, even on narrow cards (`city_codes: always` brings the codes back).
 - New style **Fleur de Lis (gold glass)** (`theme: fleur`): columns are Time, Destination/Origin, Airline, Gate, Status (Gate shows a dash until a flight's gate is known). the look of the landing-page redesign (charcoal background, gold accent, warm-white text, glass panels, Jost font). It uses the Raleigh row layout, so every Raleigh option (`city_codes`, `compact_time`, `airline_logos`, tracking, sorting, pop-up) works the same.
 - Tracking panel: DELAYED is amber and DIVERTED / CANCELLED red on the split-flap style (everything else stays white).

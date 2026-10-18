@@ -10,7 +10,7 @@
 //   airline dropdown with add/remove, hide private flights, time window dropdown,
 //   flight tracker (pinned panel + Track flight dropdown) and the split-flap
 //   character-cycling animation.
-const FBC_VERSION = "1.13.0";
+const FBC_VERSION = "1.13.1";
 const FBC_THEMES = {
   classic:   "Classic (yellow)",
   splitflap: "Split-flap",
@@ -1179,7 +1179,7 @@ th .sorth.on { color:var(--fg); }
     let cd = "";
     const landed = !!ra || (lv && lv.has_landed);
     if (landed) cd = ra ? "Landed " + this._dur(now - ra) + " ago" : "Landed";
-    else if (rd || (pos && !pos.onGround && pos.alt && pos.alt > 500)) { const t = ea || sa; cd = t ? (t > now ? "Lands in " + this._dur(t - now) : "Landing now (expected " + this._fmt(t, dTz) + ")") : ""; }
+    else if (rd || (pos && !pos.onGround && pos.alt && pos.alt > 500)) { const t = ea || sa; cd = t ? (t > now ? "Lands in " + this._dur(t - now) + " (" + this._fmt(t, dTz) + ")" : "Landing now (expected " + this._fmt(t, dTz) + ")") : ""; }
     else { const t = ed || sd; cd = t ? (t > now ? "Departs in " + this._dur(t - now) : "Departure time passed (" + this._fmt(t, oTz) + ")") : ""; }
     // Distance to the destination airport
     let dist = "";

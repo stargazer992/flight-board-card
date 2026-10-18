@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.1 (fork)
+
+- Tracking panel: "Lands in 22 min" now also shows the arrival clock time in the destination's local time, e.g. "Lands in 22 min (11:22 PM)".
+
 ## 1.13.0 (fork)
 
 - Tracking panel: the Position section shows where the aircraft is as "57 miles southwest of Charleston, WV" (nearest major city) instead of latitude / longitude.

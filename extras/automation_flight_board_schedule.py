@@ -60,6 +60,12 @@ import urllib.request
 # Sensor created by the Flightradar24 integration that lists the tracked flights
 TRACKED_SENSOR = "sensor.flightradar24_additional_tracked"
 
+# False (default): only flights the card is tracking right now (or EXTRA_FLIGHTS) are looked up. The Flightradar24
+# integration keeps its own "additional tracked" list, which can hold old flights nobody is tracking any more;
+# with False those are ignored (their position data is still used as a hint for flights that ARE tracked).
+# True: look up every flight on that list too.
+LOOKUP_INTEGRATION_TRACKED = False
+
 # Sensor created by this script (the card reads it)
 OUT_SENSOR = "sensor.flight_board_schedule"
 OUT_NAME = "Flight board schedule"
@@ -986,7 +992,7 @@ def fb_sched_codes():
             code = fb_sched_norm(flight.get("flight_number") or flight.get("callsign"))
             if not code:
                 continue
-            if code not in codes:
+            if LOOKUP_INTEGRATION_TRACKED and code not in codes:
                 codes.append(code)
             if flight.get("tracked_type") == "live":
                 hints[code] = {

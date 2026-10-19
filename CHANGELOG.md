@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Companion script: flights left on the Flightradar24 integration's "additional tracked" list (old ones the card never removed) are no longer looked up, so they cannot cause "Could not get the schedule from Flightradar24" notices. Only flights the card is tracking now are looked up. Setting `LOOKUP_INTEGRATION_TRACKED` (default False) brings the old behaviour back.
 - Companion script: live OpenSky polling now happens only for flights that are tracked on the card. The card marks tracked flights (`tracked: true`, renewed every 5 minutes) and sends `stop: true` when you remove one, so polling stops at once. A flight you only click for details is looked up but never polled live. New `TRACK_MINUTES` (12) is the safety timeout if the card stops asking.
 
 ## 1.14.0 (fork)
